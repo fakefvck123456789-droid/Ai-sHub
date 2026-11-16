@@ -38,7 +38,7 @@ The included synthetic corpus is for pipeline verification only. It is not a mea
 
 ## Known gaps
 
-- The trainer is a minimal single-corpus loop; it does not yet include held-out validation, checkpoint resume, learning-rate scheduling, mixed precision, gradient accumulation, or distributed training.
+- The trainer uses a deterministic tail slice as held-out validation and reports validation loss during training. It does not yet include checkpoint resume, learning-rate scheduling, mixed precision, gradient accumulation, or distributed training.
 - No large, curated, legally documented corpus is bundled.
 - No pretrained weights or benchmark results are supplied.
 - Mobile PyTorch availability is platform-dependent; CPU training on an Android phone is not guaranteed.
