@@ -8,7 +8,7 @@ This repository is an active foundation build, not a finished AI product or trai
 - **Tokenizer:** custom byte-level BPE with deterministic ranked merges, bounded training samples, Unicode-safe round trips, and chunked encoding.
 - **Training:** CPU-first training loop, held-out validation, checkpoint save/resume with optimizer and RNG state, corpus/config/tokenizer identity checks.
 - **Evaluation:** separate-corpus next-token loss and perplexity CLI.
-- **Inference:** local generation CLI and loopback HTTP server with health, model listing, generation, request limits, and restricted local PWA CORS.
+- **Inference/router:** local generation CLI, explicit capability router, and loopback HTTP server with health, model listing, generation, request limits, and restricted local PWA CORS. Unsupported tasks are rejected; there is no external fallback.
 - **Corpus preparation:** explicit per-file source/license manifest, training-permission gate, Unicode normalization, paragraph deduplication, and SHA-256 provenance output.
 - **App:** installable mobile-first PWA for the local model server. It is not a compiled native Android APK.
 - **Automation:** GitHub Actions runs the Python test suite. The latest verified code revision passed 33 tests.
