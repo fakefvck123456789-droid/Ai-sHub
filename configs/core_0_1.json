@@ -1,0 +1,25 @@
+{
+  "model_type": "decoder_only_transformer",
+  "context_length": 512,
+  "layers": 4,
+  "heads": 4,
+  "embedding_dim": 256,
+  "feed_forward_dim": 1024,
+  "dropout": 0.0,
+  "position_encoding": "rotary",
+  "normalization": "rmsnorm",
+  "feed_forward": "swiglu",
+  "tokenizer": {
+    "type": "byte_bpe",
+    "vocab_size_target": 512,
+    "minimum_pair_frequency": 2
+  },
+  "training": {
+    "objective": "next_token_prediction",
+    "optimizer": "AdamW",
+    "default_learning_rate": 0.0003,
+    "default_batch_size": 8,
+    "default_device": "cpu"
+  },
+  "status": "architecture_configuration_only_no_pretrained_weights"
+}
