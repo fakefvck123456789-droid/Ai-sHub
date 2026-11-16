@@ -12,13 +12,14 @@ The repository contains:
 - A dependency-light bigram baseline for testing the original data pipeline.
 - A PyTorch decoder-only Transformer with causal attention, RoPE, RMSNorm, SwiGLU, next-token loss, and autoregressive generation.
 - A custom byte-level BPE tokenizer.
-- A minimal training and checkpoint inference CLI.
+- A training and checkpoint inference CLI.
+- A dynamic-sequence ONNX export path with ONNX Runtime numerical parity checks.
 
-Neither path includes pretrained weights. A successful run on the tiny sample corpus is only a software smoke test, not evidence of useful language ability or general reasoning.
+Neither model path includes pretrained weights. A successful run on the tiny sample corpus is only a software smoke test, not evidence of useful language ability or general reasoning.
 
 ## Repository layout
 
-- `core/` — tokenizer, bigram baseline, Transformer, training, generation, and local API server
+- `core/` — tokenizer, bigram baseline, Transformer, training, generation, export, and local API server
 - `configs/` — canonical Core 0.1 architecture configuration
 - `data/` — corpus instructions and provenance template; no unlicensed corpus is bundled
 - `tests/` — automated tests
@@ -44,7 +45,6 @@ python -m core.train --input data/sample.txt --output artifacts/ngram.json
 python -m core.server --model artifacts/ngram.json
 ```
 
-
 ## Prepare a licensed training corpus
 
 Before training on external text, prepare a source manifest and run the provenance-gated cleaner:
@@ -57,63 +57,35 @@ Every input text file must have a source URL, exact license name, and explicit `
 
 ## Train and run Core Transformer
 
-The trainer now uses the custom byte-level BPE tokenizer. The included sample corpus is synthetic and far too small to produce a useful language model; it is suitable only for a short code-path smoke test.
+The trainer uses the custom byte-level BPE tokenizer. The included sample corpus is synthetic and far too small to produce a useful language model; it is suitable only for a short code-path smoke test.
 
 ```bash
 python -m core.transformer_train --input data/sample.txt --output artifacts/core-0.1.pt --steps 2 --batch-size 2 --context-length 16 --vocab-size 256
 python -m core.transformer_generate --checkpoint artifacts/core-0.1.pt --prompt "Ai'Hub" --max-new-tokens 20
-python -m core.transformer_server --checkpoint artifacts/core-0.1.pt --host 127.0.0.1 --port 8766
 ```
 
-To evaluate on a separate held-out text file (create `data/heldout.txt` from data not used for training):
+To evaluate on a separate held-out text file, use `core.transformer_eval`. For real experiments, supply a legally usable, sufficiently large corpus and record its origin and license in `data/CORPUS_SOURCES.md`.
+
+## Export for mobile inference
+
+Export a trained checkpoint to a dynamic-sequence ONNX graph and verify it against PyTorch:
 
 ```bash
-python -m core.transformer_eval --checkpoint artifacts/core-0.1.pt --input data/heldout.txt
+python -m core.export_onnx --checkpoint artifacts/core-0.1.pt --output artifacts/core-0.1.onnx
 ```
 
-This reports average next-token loss and perplexity. Compare runs only when they use the same evaluation corpus and tokenizer; a tiny or overlapping corpus is not a meaningful benchmark.
+The export includes logits only; the Android host must apply the same byte-level BPE tokenizer and perform autoregressive sampling by repeatedly invoking the ONNX graph. ONNX export and runtime validation do not themselves mean the Android app has integrated the model. The exported graph is not bundled into the current APK.
 
-The canonical architecture is 4 layers, 4 heads, 256-dimensional embeddings, 1024-dimensional feed-forward layers, and a 512-token context. The training CLI allows shorter contexts for smoke tests and constrained experiments. Training cost rises quickly with context, batch size, and corpus size.
+The canonical architecture is 4 layers, 4 heads, 256-dimensional embeddings, 1024-dimensional feed-forward layers, and a 512-token context. Training cost rises with context, batch size, and corpus size.
 
-For real experiments, supply a legally usable, sufficiently large corpus and record its origin and license in `data/CORPUS_SOURCES.md`. Train and resume against the exact same corpus file:
+## Mobile app
 
-```bash
-python -m core.transformer_train --input data/prepared/corpus.txt --output artifacts/core-0.1.pt --steps 1000 --context-length 128
-python -m core.transformer_train --input data/prepared/corpus.txt --output artifacts/core-0.1.pt --steps 2000 --context-length 128 --resume artifacts/core-0.1.pt
-```
-
-Here `--steps` is the target total step count, not additional steps. Resume verifies the corpus hash, tokenizer, model configuration, and validation split. See [Transformer implementation notes](docs/TRANSFORMER.md).
-
-Benchmark local inference on your target hardware:
-
-```bash
-python -m core.transformer_benchmark --checkpoint artifacts/core-0.1.pt --prompt "Ai'Hub" --new-tokens 32 --warmup 1 --repeats 5 --device cpu
-```
-
-This measures the current checkpoint only; it does not establish model quality.
-
-
-## Mobile app (PWA)
-
-A mobile-first installable PWA is included in `app/`, alongside a native Android WebView shell in `android/` that bundles and serves the app assets locally. The native shell still requires the local Python Core inference server; it does not embed a PyTorch runtime. The Android workflow builds a debug APK artifact.
-
-With the Transformer server running in one terminal, serve the app in another:
-
-```bash
-python -m http.server 8080 --bind 127.0.0.1 --directory app
-```
-
-Open `http://127.0.0.1:8080` on the same device. On Android, use the browser's **Add to Home screen** / **Install app** option if available. See [app setup](app/README.md). A native Android WebView APK project is also available; see [Android build and install instructions](android/README.md). The API restricts browser CORS to the two local origins on port 8080.
-
-## Android / Termux
-
-The bigram prototype can run with standard Python. PyTorch installation support varies by Android device, Python version, and available package builds; `pip install -r requirements.txt` is not guaranteed to work in Termux. For Transformer training, use a supported Linux, Windows, or macOS CPU environment unless a compatible Android PyTorch build has been independently verified.
+A mobile-first installable PWA and a native Android WebView shell are included. The current APK still bundles a tiny statistical bigram demo, not the Transformer or ONNX runtime. See [Android build and install instructions](android/README.md).
 
 ## Known limitations
 
-- The Transformer trainer supports gradient accumulation and warmup/cosine learning-rate scheduling. Mixed precision and distributed training remain future work. Checkpoint resume stores optimizer and RNG state and verifies corpus identity.
-- Byte-level BPE uses a bounded training sample and ranked-merge encoding, but remains a reference implementation rather than a production tokenizer.
 - No curated training corpus, pretrained weights, benchmark results, or validated model release exists.
+- The ONNX graph is a deployment milestone only; native Android integration, tokenizer parity, performance profiling, and model packaging remain to be completed.
 - No claim of independent reasoning capability is made at this stage.
 
 ## License

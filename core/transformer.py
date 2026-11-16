@@ -80,15 +80,22 @@ class CausalSelfAttention(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch, time, width = x.shape
         q, k, v = self.qkv(x).chunk(3, dim=-1)
+
         def split_heads(t):
             return t.view(batch, time, self.heads, self.head_dim).transpose(1, 2)
+
         q, k, v = split_heads(q), split_heads(k), split_heads(v)
         positions = torch.arange(time, device=x.device)
         q, k = apply_rope(q, positions), apply_rope(k, positions)
-        attended = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True,
-            dropout_p=self.dropout if self.training else 0.0,
-        )
+
+        # Explicit causal attention uses standard tensor operations so the
+        # model can be exported to ONNX Runtime on Android and other devices.
+        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        causal_mask = torch.ones((time, time), device=x.device, dtype=torch.bool).triu(1)
+        scores = scores.masked_fill(causal_mask, torch.finfo(scores.dtype).min)
+        weights = F.softmax(scores.float(), dim=-1).to(dtype=v.dtype)
+        weights = F.dropout(weights, p=self.dropout, training=self.training)
+        attended = torch.matmul(weights, v)
         attended = attended.transpose(1, 2).contiguous().view(batch, time, width)
         return self.output(attended)
 

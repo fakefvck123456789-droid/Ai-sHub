@@ -1,3 +1,7 @@
 # PyTorch provides the actual neural Transformer implementation.
 # Install a platform-compatible CPU build for your operating system.
 torch>=2.2
+
+# Optional deployment/export dependencies. Used to validate the portable ONNX graph.
+onnx>=1.15
+onnxruntime>=1.17
