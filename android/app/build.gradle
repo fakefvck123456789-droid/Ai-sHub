@@ -1,0 +1,20 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.aihub.local"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.aihub.local"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    sourceSets {
+        main.assets.srcDirs = ["src/main/assets", "../../app"]
+    }
+}
