@@ -43,6 +43,12 @@ class BytePairTokenizerTests(unittest.TestCase):
         for sample in ("aaaaa", "ababababa", "xyz xyz", "বাংলা", "a" * 300):
             self.assertEqual(tokenizer.encode(sample), reference_encode(sample, tokenizer.merges))
 
+    def test_large_unicode_text_round_trips_across_chunks(self):
+        source = "বাংলা ভাষা and Ai'Hub. " * 1500
+        tokenizer = BytePairTokenizer().fit(source, vocab_size=320)
+        self.assertGreater(len(source.encode("utf-8")), 8192)
+        self.assertEqual(tokenizer.decode(tokenizer.encode(source)), source)
+
     def test_training_sample_limit_is_serialized(self):
         tokenizer = BytePairTokenizer(max_training_bytes=64).fit("ab" * 1000, vocab_size=280)
         restored = BytePairTokenizer.from_dict(tokenizer.to_dict())
