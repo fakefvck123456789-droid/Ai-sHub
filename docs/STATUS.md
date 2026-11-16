@@ -8,7 +8,7 @@ This repository is an active foundation build, not a finished AI product or trai
 - **Tokenizer:** custom byte-level BPE with deterministic ranked merges, bounded training samples, Unicode-safe round trips, and chunked encoding.
 - **Training:** CPU-first training loop, held-out validation, checkpoint save/resume with optimizer and RNG state, corpus/config/tokenizer identity checks, gradient accumulation, and warmup/cosine learning-rate scheduling.
 - **Evaluation/benchmarking:** separate-corpus next-token loss and perplexity CLI, plus a local generation latency/throughput and memory benchmark.
-- **Inference/router:** local generation CLI, explicit capability router, and loopback HTTP server with health, model listing, generation, request limits, and restricted local PWA CORS. Unsupported tasks are rejected; there is no external fallback.
+- **Inference/router:** local generation CLI, extensible local capability registry/router, and loopback HTTP server with health, model listing, generation, request limits, and restricted local PWA CORS. Unsupported tasks are rejected; there is no external fallback.
 - **Corpus preparation:** explicit per-file source/license manifest, training-permission gate, Unicode normalization, paragraph deduplication, and SHA-256 provenance output.
 - **App:** installable mobile-first PWA discovers selectable local models from `/models`; a native Android WebView shell and debug-APK CI build are now added. The native shell still depends on a separately running local Python inference server.
 - **Automation:** GitHub Actions runs Python tests, Python bytecode compilation, and PWA JavaScript syntax checks. The latest verified code revision passed 36 tests; the new training/benchmark work is awaiting its CI run.
@@ -20,7 +20,7 @@ This repository is an active foundation build, not a finished AI product or trai
 - The model has not been trained or benchmarked on the target Redmi Android device.
 - PyTorch installation and execution in Android/Termux have not been verified.
 - There is no native Android APK yet.
-- Specialized Code, Vision, Image, Voice, and Motion models are not implemented.
+- Specialized Code, Vision, Image, Voice, and Motion checkpoints/architectures are not implemented; the router now supports registering future local families without remote fallback.
 - Mixed precision and distributed training are not implemented.
 
 ## What is required before calling Core 0.1 finished
