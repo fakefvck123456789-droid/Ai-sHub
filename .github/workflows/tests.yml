@@ -3,8 +3,22 @@ name: tests
 on:
   push:
     branches: [main]
+    paths:
+      - "core/**"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/tests.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "core/**"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/tests.yml"
+
+concurrency:
+  group: python-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   python-tests:
