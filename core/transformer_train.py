@@ -13,6 +13,16 @@ from core.bpe_tokenizer import BytePairTokenizer
 from core.transformer import AiHubTransformer, TransformerConfig
 
 
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "core_0_1.json"
+
+
+def load_base_config(path: Path = CONFIG_PATH) -> dict:
+    config = json.loads(path.read_text(encoding="utf-8"))
+    if config.get("model_type") != "decoder_only_transformer":
+        raise ValueError("Unsupported Core model configuration")
+    return config
+
+
 def make_batches(tokens: list[int], context: int, batch_size: int, device: str):
     if len(tokens) < context + 1:
         raise ValueError(f"Corpus needs at least {context + 1} tokens; got {len(tokens)}")
@@ -62,14 +72,26 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     corpus_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
     split_at = int(len(text) * (1.0 - validation_fraction))
     training_text, validation_text = text[:split_at], text[split_at:]
-    tokenizer = BytePairTokenizer(max_training_bytes=bpe_training_bytes).fit(training_text, vocab_size=vocab_size)
+    base_config = load_base_config()
+    tokenizer_config = base_config["tokenizer"]
+    tokenizer = BytePairTokenizer(
+        min_frequency=int(tokenizer_config["minimum_pair_frequency"]),
+        max_training_bytes=bpe_training_bytes,
+    ).fit(training_text, vocab_size=vocab_size)
     train_tokens = tokenizer.encode(training_text)
     validation_tokens = tokenizer.encode(validation_text)
     tokens = train_tokens + validation_tokens
     if len(train_tokens) < context_length + 1 or len(validation_tokens) < context_length + 1:
         raise ValueError("Corpus is too short for the selected context and validation split")
-    config = TransformerConfig(vocab_size=tokenizer.vocab_size,
-                               context_length=context_length)
+    config = TransformerConfig(
+        vocab_size=tokenizer.vocab_size,
+        context_length=context_length,
+        layers=int(base_config["layers"]),
+        heads=int(base_config["heads"]),
+        embedding_dim=int(base_config["embedding_dim"]),
+        feed_forward_dim=int(base_config["feed_forward_dim"]),
+        dropout=float(base_config["dropout"]),
+    )
     model = AiHubTransformer(config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     start_step = 0
