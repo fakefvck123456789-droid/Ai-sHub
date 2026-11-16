@@ -43,7 +43,8 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
           batch_size: int = 8, learning_rate: float = 3e-4,
           context_length: int = 128, device: str = "cpu", seed: int = 42,
           vocab_size: int = 512, eval_interval: int = 100,
-          eval_batches: int = 10, validation_fraction: float = 0.1) -> dict:
+          eval_batches: int = 10, validation_fraction: float = 0.1,
+          resume_from: Path | None = None) -> dict:
     if steps < 1 or batch_size < 1 or context_length < 1 or learning_rate <= 0:
         raise ValueError("steps, batch_size, context_length and learning_rate must be positive")
     if vocab_size < 256 or eval_interval < 1 or eval_batches < 1:
@@ -67,10 +68,30 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
                                context_length=context_length)
     model = AiHubTransformer(config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    start_step = 0
+    if resume_from is not None:
+        checkpoint = torch.load(resume_from, map_location=device, weights_only=True)
+        if checkpoint.get("format_version") != 1 or checkpoint.get("project") != "Ai'Hub Core 0.1":
+            raise ValueError("Resume file is not a supported Ai'Hub checkpoint")
+        if checkpoint.get("config") != model.config_dict():
+            raise ValueError("Resume checkpoint model configuration does not match this run")
+        if checkpoint.get("tokenizer") != tokenizer.to_dict():
+            raise ValueError("Resume checkpoint tokenizer does not match this corpus")
+        if "optimizer_state_dict" not in checkpoint:
+            raise ValueError("Resume checkpoint does not contain optimizer state")
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_step = int(checkpoint.get("training", {}).get("completed_steps", 0))
+        if steps <= start_step:
+            raise ValueError("steps must be greater than the checkpoint's completed_steps")
+        if "rng_state" in checkpoint:
+            torch.set_rng_state(checkpoint["rng_state"].cpu())
+        if device.startswith("cuda") and checkpoint.get("cuda_rng_state") is not None:
+            torch.cuda.set_rng_state_all(checkpoint["cuda_rng_state"])
     model.train()
     last_train_loss = None
     validation_loss = None
-    for step in range(1, steps + 1):
+    for step in range(start_step + 1, steps + 1):
         x, y = make_batches(train_tokens, context_length, batch_size, device)
         _, loss = model(x, y)
         optimizer.zero_grad(set_to_none=True)
@@ -89,7 +110,10 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         "config": model.config_dict(),
         "tokenizer": tokenizer.to_dict(),
         "model_state_dict": model.state_dict(),
-        "training": {"steps": steps, "batch_size": batch_size,
+        "optimizer_state_dict": optimizer.state_dict(),
+        "rng_state": torch.get_rng_state(),
+        "cuda_rng_state": torch.cuda.get_rng_state_all() if device.startswith("cuda") else None,
+        "training": {"steps": steps, "completed_steps": steps, "batch_size": batch_size,
                      "learning_rate": learning_rate, "context_length": context_length,
                      "seed": seed, "final_training_loss": last_train_loss,
                      "validation_loss": validation_loss,
@@ -114,13 +138,14 @@ def main():
     parser.add_argument("--eval-interval", type=int, default=100)
     parser.add_argument("--eval-batches", type=int, default=10)
     parser.add_argument("--validation-fraction", type=float, default=0.1)
+    parser.add_argument("--resume", type=Path, help="Resume from a compatible Ai'Hub checkpoint")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     stats = train(args.input, args.output, args.steps, args.batch_size,
                   args.learning_rate, args.context_length, args.device, args.seed,
                   args.vocab_size, args.eval_interval, args.eval_batches,
-                  args.validation_fraction)
+                  args.validation_fraction, args.resume)
     print(json.dumps(stats, indent=2))
 
 
