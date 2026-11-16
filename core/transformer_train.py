@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 from pathlib import Path
 
@@ -55,9 +56,15 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
           context_length: int = 128, device: str = "cpu", seed: int = 42,
           vocab_size: int | None = None, eval_interval: int = 100,
           eval_batches: int = 10, validation_fraction: float = 0.1,
-          resume_from: Path | None = None, bpe_training_bytes: int | None = None) -> dict:
+          resume_from: Path | None = None, bpe_training_bytes: int | None = None,
+          gradient_accumulation_steps: int = 1, warmup_steps: int = 0,
+          min_lr_ratio: float = 0.1) -> dict:
     if steps < 1 or batch_size < 1 or context_length < 1 or learning_rate <= 0:
         raise ValueError("steps, batch_size, context_length and learning_rate must be positive")
+    if gradient_accumulation_steps < 1 or warmup_steps < 0 or warmup_steps >= steps:
+        raise ValueError("gradient_accumulation_steps must be positive and warmup_steps must be less than steps")
+    if not 0.0 <= min_lr_ratio <= 1.0:
+        raise ValueError("min_lr_ratio must be between 0 and 1")
     if (vocab_size is not None and vocab_size < 256) or eval_interval < 1 or eval_batches < 1:
         raise ValueError("vocab_size must be >=256; evaluation settings must be positive")
     if bpe_training_bytes is not None and bpe_training_bytes < 1:
@@ -127,14 +134,28 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     model.train()
     last_train_loss = None
     validation_loss = None
+    current_learning_rate = learning_rate
     for step in range(start_step + 1, steps + 1):
-        x, y = make_batches(train_tokens, context_length, batch_size, device)
-        _, loss = model(x, y)
+        if warmup_steps and step <= warmup_steps:
+            schedule_factor = step / warmup_steps
+        else:
+            decay_steps = max(1, steps - warmup_steps)
+            progress = min(1.0, max(0.0, (step - warmup_steps) / decay_steps))
+            cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+            schedule_factor = min_lr_ratio + (1.0 - min_lr_ratio) * cosine
+        current_learning_rate = learning_rate * schedule_factor
+        for group in optimizer.param_groups:
+            group["lr"] = current_learning_rate
         optimizer.zero_grad(set_to_none=True)
-        loss.backward()
+        micro_losses = []
+        for _ in range(gradient_accumulation_steps):
+            x, y = make_batches(train_tokens, context_length, batch_size, device)
+            _, loss = model(x, y)
+            (loss / gradient_accumulation_steps).backward()
+            micro_losses.append(float(loss.detach().cpu()))
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
-        last_train_loss = float(loss.detach().cpu())
+        last_train_loss = sum(micro_losses) / len(micro_losses)
         if step % eval_interval == 0 or step == steps:
             validation_loss = evaluate(model, validation_tokens, context_length,
                                        batch_size, eval_batches, device)
@@ -151,7 +172,7 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         "rng_state": torch.get_rng_state(),
         "cuda_rng_state": torch.cuda.get_rng_state_all() if device.startswith("cuda") else None,
         "training": {"steps": steps, "completed_steps": steps, "batch_size": batch_size,
-                     "learning_rate": learning_rate, "context_length": context_length,
+                     "learning_rate": learning_rate, "current_learning_rate": current_learning_rate,\n                     "gradient_accumulation_steps": gradient_accumulation_steps,\n                     "warmup_steps": warmup_steps, "min_lr_ratio": min_lr_ratio,\n                     "effective_batch_size": batch_size * gradient_accumulation_steps,\n                     "context_length": context_length,
                      "seed": seed, "final_training_loss": last_train_loss,
                      "validation_loss": validation_loss,
                      "validation_fraction": validation_fraction},
@@ -160,7 +181,7 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
             "validation_tokens": len(validation_tokens), "vocabulary": tokenizer.vocab_size,
             "learned_merges": len(tokenizer.merges), "final_training_loss": last_train_loss,
             "validation_loss": validation_loss, "output": str(output_path),
-            "device": device, "parameters": sum(p.numel() for p in model.parameters())}
+            "device": device, "learning_rate": current_learning_rate,\n            "gradient_accumulation_steps": gradient_accumulation_steps,\n            "effective_batch_size": batch_size * gradient_accumulation_steps,\n            "parameters": sum(p.numel() for p in model.parameters())}
 
 
 def main():
@@ -171,6 +192,9 @@ def main():
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--context-length", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
+    parser.add_argument("--warmup-steps", type=int, default=0)
+    parser.add_argument("--min-lr-ratio", type=float, default=0.1)
     parser.add_argument("--vocab-size", type=int, default=None)
     parser.add_argument("--bpe-training-bytes", type=int, default=None)
     parser.add_argument("--eval-interval", type=int, default=100)
@@ -183,7 +207,7 @@ def main():
     stats = train(args.input, args.output, args.steps, args.batch_size,
                   args.learning_rate, args.context_length, args.device, args.seed,
                   args.vocab_size, args.eval_interval, args.eval_batches,
-                  args.validation_fraction, args.resume, args.bpe_training_bytes)
+                  args.validation_fraction, args.resume, args.bpe_training_bytes,\n                  args.gradient_accumulation_steps, args.warmup_steps, args.min_lr_ratio)
     print(json.dumps(stats, indent=2))
 
 
