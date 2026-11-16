@@ -95,7 +95,7 @@ This measures the current checkpoint only; it does not establish model quality.
 
 ## Mobile app (PWA)
 
-A mobile-first installable web app is included in `app/`. It is a PWA, not a compiled native APK. It communicates with the local Transformer server only; no external AI API is used.
+A mobile-first installable PWA is included in `app/`, alongside a native Android WebView shell in `android/` that bundles and serves the app assets locally. The native shell still requires the local Python Core inference server; it does not embed a PyTorch runtime. The Android workflow builds a debug APK artifact.
 
 With the Transformer server running in one terminal, serve the app in another:
 
