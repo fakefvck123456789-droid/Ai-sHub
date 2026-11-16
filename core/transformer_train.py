@@ -185,7 +185,10 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
             "validation_tokens": len(validation_tokens), "vocabulary": tokenizer.vocab_size,
             "learned_merges": len(tokenizer.merges), "final_training_loss": last_train_loss,
             "validation_loss": validation_loss, "output": str(output_path),
-            "device": device, "learning_rate": current_learning_rate,\n            "gradient_accumulation_steps": gradient_accumulation_steps,\n            "effective_batch_size": batch_size * gradient_accumulation_steps,\n            "parameters": sum(p.numel() for p in model.parameters())}
+            "device": device, "learning_rate": current_learning_rate,
+            "gradient_accumulation_steps": gradient_accumulation_steps,
+            "effective_batch_size": batch_size * gradient_accumulation_steps,
+            "parameters": sum(p.numel() for p in model.parameters())}
 
 
 def main():
@@ -211,7 +214,8 @@ def main():
     stats = train(args.input, args.output, args.steps, args.batch_size,
                   args.learning_rate, args.context_length, args.device, args.seed,
                   args.vocab_size, args.eval_interval, args.eval_batches,
-                  args.validation_fraction, args.resume, args.bpe_training_bytes,\n                  args.gradient_accumulation_steps, args.warmup_steps, args.min_lr_ratio)
+                  args.validation_fraction, args.resume, args.bpe_training_bytes,
+                  args.gradient_accumulation_steps, args.warmup_steps, args.min_lr_ratio)
     print(json.dumps(stats, indent=2))
 
 
