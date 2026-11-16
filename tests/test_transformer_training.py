@@ -4,10 +4,12 @@ from pathlib import Path
 
 try:
     import torch
-    from core.transformer_generate import load_checkpoint, generate
-    from core.transformer_train import train
 except ImportError:
     torch = None
+
+if torch is not None:
+    from core.transformer_generate import load_checkpoint, generate
+    from core.transformer_train import train
 
 
 @unittest.skipIf(torch is None, "PyTorch is required for training tests")
