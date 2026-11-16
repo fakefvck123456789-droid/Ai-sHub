@@ -84,6 +84,14 @@ python -m core.transformer_train --input data/prepared/corpus.txt --output artif
 
 Here `--steps` is the target total step count, not additional steps. Resume verifies the corpus hash, tokenizer, model configuration, and validation split. See [Transformer implementation notes](docs/TRANSFORMER.md).
 
+Benchmark local inference on your target hardware:
+
+```bash
+python -m core.transformer_benchmark --checkpoint artifacts/core-0.1.pt --prompt "Ai'Hub" --new-tokens 32 --warmup 1 --repeats 5 --device cpu
+```
+
+This measures the current checkpoint only; it does not establish model quality.
+
 
 ## Mobile app (PWA)
 
@@ -103,7 +111,7 @@ The bigram prototype can run with standard Python. PyTorch installation support 
 
 ## Known limitations
 
-- The Transformer trainer is a minimal single-corpus loop with a held-out validation slice and validation loss reporting. Learning-rate scheduling, mixed precision, gradient accumulation, and distributed training are not implemented yet. Checkpoint resume stores optimizer and RNG state and verifies corpus identity.
+- The Transformer trainer supports gradient accumulation and warmup/cosine learning-rate scheduling. Mixed precision and distributed training remain future work. Checkpoint resume stores optimizer and RNG state and verifies corpus identity.
 - Byte-level BPE uses a bounded training sample and ranked-merge encoding, but remains a reference implementation rather than a production tokenizer.
 - No curated training corpus, pretrained weights, benchmark results, or validated model release exists.
 - No claim of independent reasoning capability is made at this stage.
