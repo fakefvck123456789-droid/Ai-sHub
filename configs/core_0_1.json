@@ -12,7 +12,8 @@
   "tokenizer": {
     "type": "byte_bpe",
     "vocab_size_target": 512,
-    "minimum_pair_frequency": 2
+    "minimum_pair_frequency": 2,
+    "max_training_bytes": 100000
   },
   "training": {
     "objective": "next_token_prediction",
