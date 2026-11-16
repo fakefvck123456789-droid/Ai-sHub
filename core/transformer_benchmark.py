@@ -4,7 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import platform
-import resource
+try:
+    import resource
+except ImportError:  # Windows
+    resource = None
 import statistics
 import time
 from pathlib import Path
@@ -45,8 +48,10 @@ def benchmark(checkpoint: Path, prompt: str, new_tokens: int = 32,
             torch.cuda.synchronize(device)
         durations.append(time.perf_counter() - start)
 
-    usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    peak_rss_mb = usage / (1024 * 1024 if platform.system() == "Darwin" else 1024)
+    peak_rss_mb = None
+    if resource is not None:
+        usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        peak_rss_mb = usage / (1024 * 1024 if platform.system() == "Darwin" else 1024)
     result = {
         "checkpoint": str(checkpoint),
         "device": str(device),
