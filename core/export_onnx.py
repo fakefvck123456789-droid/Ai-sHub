@@ -1,8 +1,4 @@
-"""Export an Ai'Hub Core checkpoint to a dynamic-sequence ONNX model.
-
-The exported graph contains logits only. Tokenization and autoregressive sampling
-remain in the host application; ONNX Runtime executes one forward pass per token.
-"""
+"""Export Ai'Hub Core checkpoints and their tokenizer for Android ONNX Runtime."""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +8,7 @@ from pathlib import Path
 import torch
 from torch import nn
 
+from core.bpe_tokenizer import BytePairTokenizer
 from core.transformer import AiHubTransformer, TransformerConfig
 
 
@@ -32,12 +29,15 @@ def export_checkpoint(checkpoint_path: Path, output_path: Path,
     try:
         import onnx
     except ImportError as error:
-        raise RuntimeError("Install the optional export dependencies: pip install onnx onnxruntime") from error
+        raise RuntimeError("Install ONNX export dependencies: pip install onnx onnxruntime") from error
 
     payload = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     if payload.get("format_version") != 1 or payload.get("project") != "Ai'Hub Core 0.1":
         raise ValueError("Unsupported Ai'Hub checkpoint format")
     config = TransformerConfig.from_dict(payload["config"])
+    tokenizer = BytePairTokenizer.from_dict(payload["tokenizer"])
+    if tokenizer.vocab_size != config.vocab_size:
+        raise ValueError("Checkpoint tokenizer vocabulary does not match model configuration")
     model = AiHubTransformer(config).cpu()
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
@@ -51,11 +51,21 @@ def export_checkpoint(checkpoint_path: Path, output_path: Path,
         input_names=["token_ids"], output_names=["logits"],
         dynamic_axes={"token_ids": {0: "batch", 1: "sequence"},
                       "logits": {0: "batch", 1: "sequence"}},
-        opset_version=opset, do_constant_folding=True,
-        dynamo=False,
+        opset_version=opset, do_constant_folding=True, dynamo=False,
     )
+    import onnx
     graph = onnx.load(str(output_path))
     onnx.checker.check_model(graph)
+
+    tokenizer_path = output_path.with_name("core-0.1-tokenizer.json")
+    metadata_path = output_path.with_name("core-0.1-model.json")
+    tokenizer_path.write_text(json.dumps(tokenizer.to_dict(), ensure_ascii=False), encoding="utf-8")
+    metadata_path.write_text(json.dumps({
+        "project": "Ai'Hub Core 0.1",
+        "config": config.__dict__,
+        "tokenizer_file": tokenizer_path.name,
+        "model_file": output_path.name,
+    }, indent=2), encoding="utf-8")
 
     max_absolute_error = None
     if verify:
@@ -63,6 +73,7 @@ def export_checkpoint(checkpoint_path: Path, output_path: Path,
             import onnxruntime as ort
         except ImportError as error:
             raise RuntimeError("ONNX Runtime is required for export verification") from error
+        import numpy as np
         session = ort.InferenceSession(str(output_path), providers=["CPUExecutionProvider"])
         max_absolute_error = 0.0
         for length in sorted({1, sample_length, min(config.context_length, sample_length + 3)}):
@@ -70,16 +81,14 @@ def export_checkpoint(checkpoint_path: Path, output_path: Path,
             with torch.inference_mode():
                 expected = wrapper(ids).cpu().numpy()
             actual = session.run(["logits"], {"token_ids": ids.numpy()})[0]
-            import numpy as np
-            max_absolute_error = max(max_absolute_error,
-                                     float(np.max(np.abs(expected - actual))))
+            max_absolute_error = max(max_absolute_error, float(np.max(np.abs(expected - actual))))
         if max_absolute_error > 1e-4:
             raise RuntimeError(f"ONNX parity check failed: max absolute error {max_absolute_error}")
-    return {"output": str(output_path), "opset": opset,
+    return {"output": str(output_path), "tokenizer": str(tokenizer_path),
+            "metadata": str(metadata_path), "opset": opset,
             "parameters": sum(parameter.numel() for parameter in model.parameters()),
             "vocabulary": config.vocab_size, "context_length": config.context_length,
-            "max_absolute_error": max_absolute_error,
-            "verified": bool(verify)}
+            "max_absolute_error": max_absolute_error, "verified": bool(verify)}
 
 
 def main():

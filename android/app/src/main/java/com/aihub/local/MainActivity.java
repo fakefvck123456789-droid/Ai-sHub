@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 public final class MainActivity extends Activity {
     private WebView webView;
     private LocalAssetServer assetServer;
+    private CoreOnnxRuntime coreRuntime;
     private final Pattern tokenPattern = Pattern.compile("\\w+|[^\\w\\s]", Pattern.UNICODE_CHARACTER_CLASS);
     private final Map<String, Integer> tokenIds = new HashMap<>();
     private final List<String> vocabulary = new ArrayList<>();
@@ -36,6 +37,7 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         try {
             loadPrototypeModel();
+            coreRuntime = CoreOnnxRuntime.tryLoad(getAssets());
             assetServer = new LocalAssetServer(getAssets());
             assetServer.start();
         } catch (Exception error) {
@@ -139,11 +141,19 @@ public final class MainActivity extends Activity {
 
     private final class LocalModelBridge {
         @JavascriptInterface
-        public String modelName() { return "Ai'Hub Core bigram demo"; }
+        public String modelName() {
+            return coreRuntime != null ? coreRuntime.modelName() : "Ai'Hub Core bigram demo";
+        }
 
         @JavascriptInterface
         public String generate(String prompt, int maxTokens) {
             try {
+                if (coreRuntime != null) {
+                    JSONObject response = new JSONObject();
+                    response.put("text", coreRuntime.generate(prompt, maxTokens));
+                    response.put("prototype", false);
+                    return response.toString();
+                }
                 if (maxTokens < 1 || maxTokens > 128) throw new IllegalArgumentException("Choose 1–128 new tokens.");
                 List<Integer> output = encode(prompt == null ? "" : prompt);
                 Random random = new Random();
@@ -173,6 +183,7 @@ public final class MainActivity extends Activity {
     protected void onDestroy() {
         if (webView != null) webView.destroy();
         if (assetServer != null) assetServer.close();
+        if (coreRuntime != null) coreRuntime.close();
         super.onDestroy();
     }
 }
