@@ -103,7 +103,7 @@ With the Transformer server running in one terminal, serve the app in another:
 python -m http.server 8080 --bind 127.0.0.1 --directory app
 ```
 
-Open `http://127.0.0.1:8080` on the same device. On Android, use the browser's **Add to Home screen** / **Install app** option if available. See [app setup](app/README.md). The API restricts browser CORS to the two local origins on port 8080.
+Open `http://127.0.0.1:8080` on the same device. On Android, use the browser's **Add to Home screen** / **Install app** option if available. See [app setup](app/README.md). A native Android WebView APK project is also available; see [Android build and install instructions](android/README.md). The API restricts browser CORS to the two local origins on port 8080.
 
 ## Android / Termux
 
