@@ -30,6 +30,10 @@ class TransformerTrainingTests(unittest.TestCase):
             self.assertTrue(torch.isfinite(torch.tensor(stats["validation_loss"])).item())
             model, tokenizer = load_checkpoint(checkpoint)
             self.assertEqual(model.config.vocab_size, tokenizer.vocab_size)
+            self.assertEqual(model.config.layers, 4)
+            self.assertEqual(model.config.heads, 4)
+            self.assertEqual(model.config.embedding_dim, 256)
+            self.assertEqual(model.config.feed_forward_dim, 1024)
             generated = generate(checkpoint, "Ai", max_new_tokens=2, top_k=5)
             self.assertTrue(generated.startswith("Ai"))
 
