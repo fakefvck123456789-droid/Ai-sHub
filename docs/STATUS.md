@@ -1,26 +1,30 @@
 # Project status
 
-## Working in the Android prototype
+## Android reliability work
+- Replaced the custom loopback HTTP asset server with AndroidX WebViewAssetLoader and a stable HTTPS app-assets origin.
+- Removed the app's unnecessary INTERNET permission and custom network-security exception.
+- Demo-model load failures now enter a minimal fallback state instead of immediately closing the activity.
+- ONNX runtime initialization failures are logged and fall back to the demo path.
+- The JavaScript bridge reports startup warnings and generation errors.
+- CI compiles the APK, but crash-free behavior is not confirmed until physical-device tests and logcat review.
 
-- Native Android WebView shell bundles the app interface and runs offline.
-- A small statistical bigram model remains bundled as the fallback demonstration asset.
-- Android includes ONNX Runtime for Android and a native Java inference bridge.
-- When a valid trained Core package is present, Android loads the ONNX graph and the matching byte-level BPE tokenizer and performs autoregressive inference locally.
-- Android BPE encoding uses ranked merge candidates and a priority queue to avoid repeatedly scanning the full merge table.
-- The app can open without Termux, Python, a remote server, API keys, or an account.
-- Android debug APK builds and Python tests run in GitHub Actions.
+## Core 0.1 target
+- Languages: Bangla (bn) and English (en), one shared model and byte-level BPE tokenizer.
+- Architecture: 4-layer decoder-only Transformer, 4 heads, 256 embedding dimensions, 1024 feed-forward dimensions, RoPE, RMSNorm, SwiGLU, 512-token context.
+- Tokenizer target: 8,192 tokens.
+- A bilingual corpus validator rejects data lacking at least 10% Bangla letters and 10% basic Latin letters.
 
-## Important limitation
+## Still not complete
+- No reviewed bilingual training corpus is in the repository.
+- No trained release checkpoint, evaluated model card, or bundled Core ONNX asset exists.
+- Physical-device crash, latency, memory, and battery testing remains outstanding.
+- A successful CI build is not a Play Store release.
 
-The repository does not yet contain a trained release checkpoint or a legally reviewed real-world training corpus. The bundled fallback model is a tiny statistical bigram model trained from synthetic sample text. It is not a neural network, Transformer, reasoning model, or useful general-purpose assistant.
-
-The ONNX Android path is implemented but remains dormant until a trained checkpoint is exported and its three generated files are bundled into the APK. A successful debug build alone does not validate inference on a physical device.
-
-## Next release gates
-
-1. Select and document legally usable training data, including language coverage and license provenance.
-2. Train Core 0.1 and evaluate it on a separate held-out corpus; record quality, memory, and latency.
-3. Export the checkpoint to ONNX and package the graph, tokenizer, and metadata in Android assets.
-4. Test real inference on target Android devices, including tokenizer parity, startup, memory, latency, and battery.
-5. Replace the fallback demo only after the trained model passes those checks.
-6. Add specialized model families only after Core is viable.
+## Release gates
+1. Verify data rights and source-level attribution for both languages.
+2. Build a balanced corpus and separate held-out Bangla and English evaluation sets.
+3. Train Core 0.1 and evaluate each language independently.
+4. Export ONNX and verify numerical parity.
+5. Bundle graph, tokenizer, and metadata in Android assets.
+6. Test install, cold start, repeated generations, long prompts, rotation, background/foreground, low-memory behavior, and offline operation on physical devices.
+7. Publish only after crash and quality gates pass.

@@ -1,5 +1,9 @@
 {
   "model_type": "decoder_only_transformer",
+  "model_family": "Ai'Hub Core",
+  "model_version": "0.1",
+  "languages": ["bn", "en"],
+  "language_policy": "bilingual_bangla_english",
   "context_length": 512,
   "layers": 4,
   "heads": 4,
@@ -11,16 +15,17 @@
   "feed_forward": "swiglu",
   "tokenizer": {
     "type": "byte_bpe",
-    "vocab_size_target": 512,
+    "vocab_size_target": 8192,
     "minimum_pair_frequency": 2,
-    "max_training_bytes": 100000
+    "max_training_bytes": 5000000
   },
   "training": {
     "objective": "next_token_prediction",
     "optimizer": "AdamW",
     "default_learning_rate": 0.0003,
     "default_batch_size": 8,
-    "default_device": "cpu"
+    "default_device": "cpu",
+    "bilingual_corpus_validation": "required_for_release"
   },
   "status": "architecture_configuration_only_no_pretrained_weights"
 }
