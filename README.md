@@ -60,7 +60,7 @@ The bigram prototype can run with standard Python. PyTorch installation support 
 
 ## Known limitations
 
-- The Transformer trainer is a minimal single-corpus loop: no held-out validation, checkpoint resume, scheduler, mixed precision, gradient accumulation, or distributed training yet.
+- The Transformer trainer is a minimal single-corpus loop with a held-out validation slice and validation loss reporting. Checkpoint resume, scheduler, mixed precision, gradient accumulation, and distributed training are not implemented yet.
 - Byte-level BPE is a simple reference implementation, not optimized for large corpora.
 - No curated training corpus, pretrained weights, benchmark results, or validated model release exists.
 - No claim of independent reasoning capability is made at this stage.
