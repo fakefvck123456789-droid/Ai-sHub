@@ -97,7 +97,7 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         if "rng_state" in checkpoint:
             torch.set_rng_state(checkpoint["rng_state"].cpu())
         if device.startswith("cuda") and checkpoint.get("cuda_rng_state") is not None:
-            torch.cuda.set_rng_state_all(checkpoint["cuda_rng_state"])
+            torch.cuda.set_rng_state_all([state.cpu() for state in checkpoint["cuda_rng_state"]])
     model.train()
     last_train_loss = None
     validation_loss = None
