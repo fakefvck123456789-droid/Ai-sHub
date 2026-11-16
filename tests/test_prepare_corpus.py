@@ -44,6 +44,21 @@ class CorpusPreparationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 prepare_corpus(source_dir, source_file, root / "corpus.txt")
 
+
+    def test_rejects_output_inside_input_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_dir = root / "raw"
+            source_dir.mkdir()
+            (source_dir / "text.txt").write_text("licensed text", encoding="utf-8")
+            source_file = root / "sources.json"
+            source_file.write_text(json.dumps({
+                "text.txt": {"source_url": "https://example.org", "license": "CC0-1.0",
+                             "training_allowed": True}
+            }), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                prepare_corpus(source_dir, source_file, source_dir / "output.txt")
+
     def test_requires_provenance_for_every_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
