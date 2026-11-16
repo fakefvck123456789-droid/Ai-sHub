@@ -39,15 +39,31 @@ class LocalModel:
 class LocalModelRouter:
     """Routes only to loaded local checkpoints; it never calls external APIs."""
     def __init__(self, tokenizer: BytePairTokenizer, model: AiHubTransformer):
-        self._models = {
-            "core-0.1": LocalModel(
-                model_id="core-0.1",
-                family="core",
-                capabilities=("text_generation",),
-                tokenizer=tokenizer,
-                model=model,
-            )
-        }
+        self._models: dict[str, LocalModel] = {}
+        self.register("core-0.1", "core", ("text_generation",), tokenizer, model)
+
+    def register(self, model_id: str, family: str, capabilities: tuple[str, ...],
+                 tokenizer: BytePairTokenizer, model: AiHubTransformer) -> None:
+        """Register a fully loaded local checkpoint; no remote provider is accepted."""
+        if not isinstance(model_id, str) or not model_id.strip():
+            raise ValueError("model_id must be a non-empty string")
+        if not isinstance(family, str) or not family.strip():
+            raise ValueError("family must be a non-empty string")
+        normalized = tuple(sorted(set(capabilities)))
+        if not normalized or any(not isinstance(item, str) or not item.strip() for item in normalized):
+            raise ValueError("at least one non-empty capability is required")
+        if model_id in self._models:
+            raise ValueError(f"Local model ID is already registered: {model_id}")
+        if tokenizer.vocab_size != model.config.vocab_size:
+            raise ValueError("Tokenizer and model vocabulary sizes do not match")
+        model.eval()
+        self._models[model_id] = LocalModel(
+            model_id=model_id,
+            family=family,
+            capabilities=normalized,
+            tokenizer=tokenizer,
+            model=model,
+        )
 
     @property
     def external_fallback(self) -> bool:
