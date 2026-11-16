@@ -10,7 +10,7 @@ This repository is an active foundation build, not a finished AI product or trai
 - **Evaluation/benchmarking:** separate-corpus next-token loss and perplexity CLI, plus a local generation latency/throughput and memory benchmark.
 - **Inference/router:** local generation CLI, extensible local capability registry/router, and loopback HTTP server with health, model listing, generation, request limits, and restricted local PWA CORS. Unsupported tasks are rejected; there is no external fallback.
 - **Corpus preparation:** explicit per-file source/license manifest, training-permission gate, Unicode normalization, paragraph deduplication, and SHA-256 provenance output.
-- **App:** installable mobile-first PWA discovers selectable local models from `/models`; a native Android WebView shell and debug-APK CI build are now added. The native shell still depends on a separately running local Python inference server.
+- **App:** installable mobile-first PWA discovers selectable local models from `/models`; a native Android WebView shell and debug-APK CI build are now added; the first debug APK build completed successfully in GitHub Actions. The native shell still depends on a separately running local Python inference server.
 - **Automation:** GitHub Actions runs Python tests, Python bytecode compilation, and PWA JavaScript syntax checks. The latest verified code revision passed 36 tests; the new training/benchmark work is awaiting its CI run.
 
 ## Not yet complete
