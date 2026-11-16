@@ -5,6 +5,7 @@ const responseNode = document.querySelector("#response");
 const errorNode = document.querySelector("#error");
 const sendButton = document.querySelector("#send");
 const copyButton = document.querySelector("#copy");
+const modelSelect = document.querySelector("#model");
 
 function apiBase() {
   return endpointInput.value.trim().replace(/\/+$/, "");
@@ -22,6 +23,27 @@ async function checkServer() {
     const info = await response.json();
     statusNode.textContent = "Online · " + (info.model || "Model ready");
     statusNode.className = "status online";
+    const modelsResponse = await fetch(apiBase() + "/models", { cache: "no-store" });
+    if (!modelsResponse.ok) throw new Error("Could not load local model list.");
+    const registry = await modelsResponse.json();
+    if (registry.external_fallback !== false || !Array.isArray(registry.data)) {
+      throw new Error("Server did not confirm local-only model routing.");
+    }
+    const selected = modelSelect.value;
+    modelSelect.replaceChildren();
+    for (const model of registry.data) {
+      if (!model.capabilities?.includes("text_generation")) continue;
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = model.id + " · " + model.status;
+      modelSelect.append(option);
+    }
+    if (![...modelSelect.options].some(option => option.value === selected)) {
+      modelSelect.selectedIndex = 0;
+    } else {
+      modelSelect.value = selected;
+    }
+    if (!modelSelect.options.length) throw new Error("No local text-generation model is loaded.");
     return true;
   } catch (error) {
     statusNode.textContent = "Offline";
@@ -49,6 +71,8 @@ sendButton.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt,
+        model: modelSelect.value,
+        task: "text_generation",
         max_new_tokens: Number(document.querySelector("#tokens").value),
         temperature: Number(document.querySelector("#temperature").value),
         top_k: Number(document.querySelector("#topk").value)
