@@ -1,0 +1,6 @@
+Ai'Hub is an independent research project.
+Ai'Hub builds its own software and models.
+A language model predicts the next token from context.
+This small corpus is synthetic and exists only to test the training pipeline.
+The prototype is a bigram model and is not a Transformer.
+A future Core model will use causal attention and learned neural network weights.
