@@ -8,6 +8,7 @@ except ImportError:
     torch = None
 
 if torch is not None:
+    from core.transformer_eval import evaluate_checkpoint
     from core.transformer_generate import load_checkpoint, generate
     from core.transformer_train import train
 
@@ -48,6 +49,22 @@ class TransformerTrainingTests(unittest.TestCase):
             self.assertEqual(resumed["steps"], 2)
             self.assertEqual(payload["training"]["completed_steps"], 2)
             self.assertIn("optimizer_state_dict", payload)
+
+
+    def test_standalone_evaluation_reports_perplexity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / "train.txt"
+            evaluation = root / "evaluation.txt"
+            checkpoint = root / "checkpoint.pt"
+            corpus.write_text(("Ai'Hub builds independent models. " * 20), encoding="utf-8")
+            evaluation.write_text("A separate evaluation corpus.", encoding="utf-8")
+            train(corpus, checkpoint, steps=1, batch_size=2,
+                  context_length=8, vocab_size=256, eval_batches=1)
+            metrics = evaluate_checkpoint(checkpoint, evaluation)
+            self.assertEqual(metrics["target_tokens"], metrics["evaluation_tokens"] - 1)
+            self.assertGreater(metrics["perplexity"], 0)
+            self.assertTrue(torch.isfinite(torch.tensor(metrics["average_loss"])).item())
 
     def test_rejects_too_short_validation_split(self):
         with tempfile.TemporaryDirectory() as directory:
