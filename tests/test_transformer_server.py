@@ -60,6 +60,24 @@ class TransformerServerTests(unittest.TestCase):
         self.assertTrue(payload["text"].startswith("hello"))
 
 
+    def test_unsupported_task_does_not_fall_back_to_external_api(self):
+        request = Request(self.base + "/generate",
+                          data=json.dumps({"prompt": "hello", "task": "vision"}).encode(),
+                          headers={"Content-Type": "application/json"})
+        with self.assertRaises(HTTPError) as caught:
+            urlopen(request, timeout=5)
+        self.assertEqual(caught.exception.code, 501)
+        payload = json.loads(caught.exception.read())
+        self.assertEqual(payload["error"], "unsupported_task")
+
+    def test_unknown_model_is_rejected(self):
+        request = Request(self.base + "/generate",
+                          data=json.dumps({"prompt": "hello", "model": "vision-0.1"}).encode(),
+                          headers={"Content-Type": "application/json"})
+        with self.assertRaises(HTTPError) as caught:
+            urlopen(request, timeout=5)
+        self.assertEqual(caught.exception.code, 404)
+
     def test_local_pwa_cors_preflight(self):
         request = Request(self.base + "/generate", method="OPTIONS",
                           headers={"Origin": "http://127.0.0.1:8080"})
