@@ -11,6 +11,7 @@ import torch
 
 from core.bpe_tokenizer import BytePairTokenizer
 from core.transformer import AiHubTransformer, TransformerConfig
+from core.router import LocalModelRouter, ModelNotFound, UnsupportedTask
 
 
 ALLOWED_ORIGINS = {"http://127.0.0.1:8080", "http://localhost:8080"}
@@ -29,6 +30,8 @@ def load_checkpoint(path: Path, device: str = "cpu"):
 
 
 def make_handler(tokenizer: BytePairTokenizer, model: AiHubTransformer):
+    router = LocalModelRouter(tokenizer, model)
+
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, payload: dict):
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -71,16 +74,8 @@ def make_handler(tokenizer: BytePairTokenizer, model: AiHubTransformer):
             elif self.path == "/models":
                 self._send(200, {
                     "object": "list",
-                    "external_fallback": False,
-                    "data": [{
-                        "id": "core-0.1",
-                        "family": "core",
-                        "capabilities": ["text_generation"],
-                        "status": "experimental",
-                        "checkpoint_loaded": True,
-                        "vocabulary_size": tokenizer.vocab_size,
-                        "context_length": model.config.context_length,
-                    }],
+                    "external_fallback": router.external_fallback,
+                    "data": router.list_models(),
                 })
             else:
                 self._send(404, {"error": "not_found"})
@@ -113,19 +108,22 @@ def make_handler(tokenizer: BytePairTokenizer, model: AiHubTransformer):
                     raise ValueError("temperature must be a finite positive number")
                 if top_k is not None and top_k < 1:
                     raise ValueError("top_k must be positive or null")
-                input_ids = tokenizer.encode(prompt)
-                if len(input_ids) > model.config.context_length:
-                    input_ids = input_ids[-model.config.context_length:]
-                tokens = torch.tensor([input_ids], dtype=torch.long,
-                                      device=next(model.parameters()).device)
-                with torch.inference_mode():
-                    output = model.generate(tokens, max_new_tokens=max_new,
-                                            temperature=temperature, top_k=top_k)
-                self._send(200, {
-                    "text": tokenizer.decode(output[0].tolist()),
-                    "model": "Ai'Hub Core 0.1 Transformer",
-                    "warning": "Experimental checkpoint; output quality is not validated.",
-                })
+                task = request.get("task", "text_generation")
+                model_id = request.get("model")
+                if not isinstance(task, str) or (model_id is not None and not isinstance(model_id, str)):
+                    raise ValueError("task and model must be strings")
+                try:
+                    result = router.generate(
+                        prompt, max_new_tokens=max_new, temperature=temperature,
+                        top_k=top_k, task=task, model_id=model_id,
+                    )
+                except ModelNotFound as exc:
+                    self._send(404, {"error": "model_not_found", "detail": str(exc)})
+                    return
+                except UnsupportedTask as exc:
+                    self._send(501, {"error": "unsupported_task", "detail": str(exc)})
+                    return
+                self._send(200, result)
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 self._send(400, {"error": "invalid_request", "detail": str(exc)})
 
