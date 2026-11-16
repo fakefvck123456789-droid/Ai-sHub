@@ -53,12 +53,12 @@ def evaluate(model: AiHubTransformer, tokens: list[int], context: int,
 def train(corpus_path: Path, output_path: Path, steps: int = 1000,
           batch_size: int = 8, learning_rate: float = 3e-4,
           context_length: int = 128, device: str = "cpu", seed: int = 42,
-          vocab_size: int = 512, eval_interval: int = 100,
+          vocab_size: int | None = None, eval_interval: int = 100,
           eval_batches: int = 10, validation_fraction: float = 0.1,
           resume_from: Path | None = None, bpe_training_bytes: int | None = None) -> dict:
     if steps < 1 or batch_size < 1 or context_length < 1 or learning_rate <= 0:
         raise ValueError("steps, batch_size, context_length and learning_rate must be positive")
-    if vocab_size < 256 or eval_interval < 1 or eval_batches < 1:
+    if (vocab_size is not None and vocab_size < 256) or eval_interval < 1 or eval_batches < 1:
         raise ValueError("vocab_size must be >=256; evaluation settings must be positive")
     if bpe_training_bytes is not None and bpe_training_bytes < 1:
         raise ValueError("bpe_training_bytes must be positive")
@@ -74,6 +74,8 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     training_text, validation_text = text[:split_at], text[split_at:]
     base_config = load_base_config()
     tokenizer_config = base_config["tokenizer"]
+    if vocab_size is None:
+        vocab_size = int(tokenizer_config["vocab_size_target"])
     if bpe_training_bytes is None:
         bpe_training_bytes = int(tokenizer_config["max_training_bytes"])
     tokenizer = BytePairTokenizer(
@@ -169,7 +171,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--context-length", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
-    parser.add_argument("--vocab-size", type=int, default=512)
+    parser.add_argument("--vocab-size", type=int, default=None)
     parser.add_argument("--bpe-training-bytes", type=int, default=None)
     parser.add_argument("--eval-interval", type=int, default=100)
     parser.add_argument("--eval-batches", type=int, default=10)
