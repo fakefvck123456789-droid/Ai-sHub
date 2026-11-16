@@ -17,7 +17,7 @@ The target architecture is configured in `configs/core_0_1.json`: 4 blocks, 4 he
 
 ## Tokenizer
 
-`core/bpe_tokenizer.py` implements byte-level BPE. The 256 base IDs represent individual UTF-8 bytes; learned merge IDs start at 256. This makes unseen scripts and symbols representable without an unknown-token fallback. It is a small reference implementation, not an optimized production tokenizer.
+`core/bpe_tokenizer.py` implements byte-level BPE. The 256 base IDs represent individual UTF-8 bytes; learned merge IDs start at 256. This makes unseen scripts and symbols representable without an unknown-token fallback. It uses ranked heap-based merging for encoding and learns merges from a bounded, evenly spaced sample of up to 100 KB by default. It remains a reference implementation, not an optimized production tokenizer.
 
 ## Train a smoke-test checkpoint
 
