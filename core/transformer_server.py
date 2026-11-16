@@ -68,6 +68,20 @@ def make_handler(tokenizer: BytePairTokenizer, model: AiHubTransformer):
                     "vocabulary_size": tokenizer.vocab_size,
                     "context_length": model.config.context_length,
                 })
+            elif self.path == "/models":
+                self._send(200, {
+                    "object": "list",
+                    "external_fallback": False,
+                    "data": [{
+                        "id": "core-0.1",
+                        "family": "core",
+                        "capabilities": ["text_generation"],
+                        "status": "experimental",
+                        "checkpoint_loaded": True,
+                        "vocabulary_size": tokenizer.vocab_size,
+                        "context_length": model.config.context_length,
+                    }],
+                })
             else:
                 self._send(404, {"error": "not_found"})
 
