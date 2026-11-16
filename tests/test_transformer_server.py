@@ -52,6 +52,22 @@ class TransformerServerTests(unittest.TestCase):
             payload = json.loads(response.read())
         self.assertTrue(payload["text"].startswith("hello"))
 
+
+    def test_local_pwa_cors_preflight(self):
+        request = Request(self.base + "/generate", method="OPTIONS",
+                          headers={"Origin": "http://127.0.0.1:8080"})
+        with urlopen(request, timeout=5) as response:
+            self.assertEqual(response.status, 204)
+            self.assertEqual(response.headers.get("Access-Control-Allow-Origin"),
+                             "http://127.0.0.1:8080")
+
+    def test_rejects_untrusted_cors_origin(self):
+        request = Request(self.base + "/generate", method="OPTIONS",
+                          headers={"Origin": "https://example.com"})
+        with self.assertRaises(HTTPError) as caught:
+            urlopen(request, timeout=5)
+        self.assertEqual(caught.exception.code, 403)
+
     def test_rejects_empty_prompt(self):
         request = Request(self.base + "/generate",
                           data=b'{"prompt":""}',
