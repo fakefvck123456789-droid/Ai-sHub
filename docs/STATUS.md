@@ -11,7 +11,7 @@ This repository is an active foundation build, not a finished AI product or trai
 - **Inference/router:** local generation CLI, explicit capability router, and loopback HTTP server with health, model listing, generation, request limits, and restricted local PWA CORS. Unsupported tasks are rejected; there is no external fallback.
 - **Corpus preparation:** explicit per-file source/license manifest, training-permission gate, Unicode normalization, paragraph deduplication, and SHA-256 provenance output.
 - **App:** installable mobile-first PWA for the local model server. It is not a compiled native Android APK.
-- **Automation:** GitHub Actions runs the Python test suite. The latest verified code revision passed 33 tests.
+- **Automation:** GitHub Actions runs the Python test suite. The latest verified code revision passed 36 tests in GitHub Actions.
 
 ## Not yet complete
 
