@@ -24,7 +24,10 @@ def prepare_corpus(input_dir: Path, sources_path: Path, output_path: Path,
         raise ValueError(f"No .txt files found in {input_dir}")
 
     manifest_path = manifest_output or output_path.with_name(output_path.name + ".manifest.json")
-    for destination in (output_path.resolve(), manifest_path.resolve()):
+    destinations = (output_path.resolve(), manifest_path.resolve())
+    if destinations[0] == destinations[1] or sources_path.resolve() in destinations:
+        raise ValueError("Corpus, provenance input, and output manifest paths must be distinct")
+    for destination in destinations:
         if destination == input_dir or input_dir in destination.parents:
             raise ValueError("Output files must be outside the input directory")
 
