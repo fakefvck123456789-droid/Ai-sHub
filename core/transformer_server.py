@@ -41,7 +41,7 @@ def make_handler(tokenizer: BytePairTokenizer, model: AiHubTransformer):
                 self._send(200, {
                     "status": "ok",
                     "model": "Ai'Hub Core 0.1 Transformer",
-                    "trained_checkpoint": True,
+                    "checkpoint_loaded": True,
                     "vocabulary_size": tokenizer.vocab_size,
                     "context_length": model.config.context_length,
                 })
