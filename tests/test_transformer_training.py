@@ -70,6 +70,38 @@ class TransformerTrainingTests(unittest.TestCase):
             self.assertGreater(metrics["perplexity"], 0)
             self.assertTrue(torch.isfinite(torch.tensor(metrics["average_loss"])).item())
 
+    def test_gradient_accumulation_and_cosine_schedule_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / "tiny.txt"
+            checkpoint = root / "checkpoint.pt"
+            corpus.write_text(("Ai'Hub builds independent models. " * 30), encoding="utf-8")
+            stats = train(
+                corpus, checkpoint, steps=3, batch_size=1,
+                context_length=8, vocab_size=256, eval_batches=1,
+                gradient_accumulation_steps=2, warmup_steps=1,
+                min_lr_ratio=0.2,
+            )
+            payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+            training = payload["training"]
+            self.assertEqual(stats["effective_batch_size"], 2)
+            self.assertEqual(training["gradient_accumulation_steps"], 2)
+            self.assertEqual(training["effective_batch_size"], 2)
+            self.assertEqual(training["warmup_steps"], 1)
+            self.assertAlmostEqual(training["current_learning_rate"], 3e-4 * 0.2, places=8)
+
+    def test_invalid_scheduler_settings_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / "tiny.txt"
+            corpus.write_text(("Ai'Hub builds independent models. " * 20), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                train(corpus, root / "unused.pt", steps=2, context_length=8,
+                      vocab_size=256, warmup_steps=2)
+            with self.assertRaises(ValueError):
+                train(corpus, root / "unused.pt", steps=2, context_length=8,
+                      vocab_size=256, min_lr_ratio=1.5)
+
     def test_rejects_too_short_validation_split(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
