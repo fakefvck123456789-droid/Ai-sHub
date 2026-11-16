@@ -13,6 +13,9 @@ from core.bpe_tokenizer import BytePairTokenizer
 from core.transformer import AiHubTransformer, TransformerConfig
 
 
+ALLOWED_ORIGINS = {"http://127.0.0.1:8080", "http://localhost:8080"}
+
+
 def load_checkpoint(path: Path, device: str = "cpu"):
     payload = torch.load(path, map_location=device, weights_only=True)
     if payload.get("format_version") != 1 or payload.get("project") != "Ai'Hub Core 0.1":
@@ -33,8 +36,28 @@ def make_handler(tokenizer: BytePairTokenizer, model: AiHubTransformer):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            origin = self.headers.get("Origin")
+            if origin in ALLOWED_ORIGINS:
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Vary", "Origin")
             self.end_headers()
             self.wfile.write(body)
+
+        def do_OPTIONS(self):
+            origin = self.headers.get("Origin")
+            if origin not in ALLOWED_ORIGINS:
+                self._send(403, {"error": "origin_not_allowed"})
+                return
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Vary", "Origin")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def do_GET(self):
             if self.path == "/health":
