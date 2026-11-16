@@ -41,6 +41,13 @@
 
     <section class="panel composer" aria-labelledby="prompt-title">
       <h3 id="prompt-title">New conversation</h3>
+      <div class="model-picker">
+        <label for="model">Local model</label>
+        <select id="model" aria-describedby="model-hint">
+          <option value="core-0.1">Ai'Hub Core 0.1</option>
+        </select>
+        <p id="model-hint" class="hint">Only checkpoints reported by your local server are selectable. Unsupported tasks are never sent to external APIs.</p>
+      </div>
       <label for="prompt">Message</label>
       <textarea id="prompt" rows="5" maxlength="12000" placeholder="Write a prompt…" required></textarea>
       <div class="settings">
