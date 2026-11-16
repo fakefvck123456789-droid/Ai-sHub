@@ -19,31 +19,31 @@
     </header>
     <section class="intro">
       <h2>Your model. Your device. Your control.</h2>
-      <p>Prompts are processed locally on this Android device. No API key, account, or internet connection is required.</p>
+      <p>Messages are processed locally on this Android device. No API key, account, or internet connection is required.</p>
     </section>
     <section class="panel connection-panel" aria-labelledby="connection-title">
       <div class="section-heading"><h3 id="connection-title">Device runtime</h3><span id="status" class="status" role="status">Loading model…</span></div>
       <p class="hint">The bundled Core prototype runs offline inside the app.</p>
     </section>
     <section class="panel composer" aria-labelledby="prompt-title">
-      <h3 id="prompt-title">New conversation</h3>
+      <h3 id="prompt-title">New message</h3>
       <div class="model-picker">
         <label for="model">Local model</label>
         <select id="model"><option>Loading…</option></select>
-        <p class="hint">This first build contains a tiny statistical bigram model to verify fully offline inference. It is not yet the planned reasoning Transformer.</p>
+        <p class="hint">This build contains a tiny statistical bigram model for testing offline inference. It is not yet the planned reasoning Transformer.</p>
       </div>
       <label for="prompt">Message</label>
-      <textarea id="prompt" rows="5" maxlength="12000" placeholder="Write a prompt…" required></textarea>
+      <textarea id="prompt" rows="4" maxlength="4000" placeholder="Write a message…" required></textarea>
       <div class="settings">
         <div><label for="tokens">New tokens</label><select id="tokens"><option value="16">16</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option></select></div>
       </div>
-      <button id="send" class="primary" type="button">Generate response</button>
+      <button id="send" class="primary" type="button">Send message</button>
       <p id="error" class="error" role="alert" hidden></p>
     </section>
     <section class="panel response-panel" aria-labelledby="response-title">
-      <div class="section-heading"><h3 id="response-title">Model response</h3><button id="copy" class="secondary small" type="button" disabled>Copy</button></div>
-      <pre id="response" aria-live="polite">Your model output will appear here.</pre>
-      <p class="disclaimer">Experimental statistical baseline only. It predicts likely next words from a tiny synthetic corpus; it does not understand questions or perform general reasoning.</p>
+      <div class="section-heading"><h3 id="response-title">Conversation</h3><button id="new-chat" class="secondary small" type="button">New chat</button></div>
+      <div id="conversation" class="conversation" aria-live="polite"><p class="empty-state">Your conversation stays on this device. Send a message to begin.</p></div>
+      <p class="disclaimer">Experimental statistical baseline only. It predicts likely next words from a tiny synthetic corpus; it does not understand questions or perform general reasoning. Conversation history is stored locally on this device.</p>
     </section>
     <footer>Ai'Hub Core · Offline prototype 0.1</footer>
   </main>

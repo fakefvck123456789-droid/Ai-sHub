@@ -1,13 +1,57 @@
 const statusNode = document.querySelector("#status");
 const promptInput = document.querySelector("#prompt");
-const responseNode = document.querySelector("#response");
+const conversationNode = document.querySelector("#conversation");
 const errorNode = document.querySelector("#error");
 const sendButton = document.querySelector("#send");
-const copyButton = document.querySelector("#copy");
+const newChatButton = document.querySelector("#new-chat");
+const HISTORY_KEY = "aihub.conversation.v1";
+let messages = loadMessages();
+
+function loadMessages() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    return Array.isArray(saved) ? saved.filter(item =>
+      item && (item.role === "user" || item.role === "assistant") &&
+      typeof item.text === "string").slice(-80) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMessages() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-80)));
+  } catch {
+    showError("Local storage is full. Start a new chat to free space.");
+  }
+}
 
 function showError(message) {
   errorNode.textContent = message;
   errorNode.hidden = !message;
+}
+
+function renderConversation() {
+  conversationNode.replaceChildren();
+  if (!messages.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Your conversation stays on this device. Send a message to begin.";
+    conversationNode.append(empty);
+    return;
+  }
+  for (const message of messages) {
+    const article = document.createElement("article");
+    article.className = "message " + message.role;
+    const label = document.createElement("span");
+    label.className = "message-label";
+    label.textContent = message.role === "user" ? "YOU" : "AI'HUB CORE";
+    const content = document.createElement("p");
+    content.textContent = message.text;
+    article.append(label, content);
+    conversationNode.append(article);
+  }
+  conversationNode.scrollTop = conversationNode.scrollHeight;
 }
 
 function initialize() {
@@ -21,6 +65,7 @@ function initialize() {
   statusNode.textContent = "Ready · " + AiHub.modelName();
   statusNode.className = "status online";
   document.querySelector("#model").replaceChildren(new Option(AiHub.modelName(), "core-prototype"));
+  renderConversation();
 }
 
 sendButton.addEventListener("click", () => {
@@ -33,30 +78,35 @@ sendButton.addEventListener("click", () => {
   showError("");
   sendButton.disabled = true;
   sendButton.textContent = "Generating…";
-  responseNode.textContent = "Generating on this device…";
-  copyButton.disabled = true;
+  messages.push({role: "user", text: prompt});
+  renderConversation();
+  const context = messages.slice(-8).map(item =>
+    (item.role === "user" ? "User: " : "Ai'Hub: ") + item.text).join("\n") + "\nAi'Hub:";
   try {
-    const result = JSON.parse(AiHub.generate(prompt, Number(document.querySelector("#tokens").value)));
+    const result = JSON.parse(AiHub.generate(context, Number(document.querySelector("#tokens").value)));
     if (result.error) throw new Error(result.error);
-    responseNode.textContent = result.text || "(The model returned an empty response.)";
-    copyButton.disabled = !result.text;
+    const answer = result.text || "(The model returned an empty response.)";
+    messages.push({role: "assistant", text: answer});
+    messages = messages.slice(-80);
+    saveMessages();
+    renderConversation();
+    promptInput.value = "";
   } catch (error) {
-    responseNode.textContent = "No response.";
+    messages.pop();
+    renderConversation();
     showError("Generation failed: " + error.message);
   } finally {
     sendButton.disabled = false;
-    sendButton.textContent = "Generate response";
+    sendButton.textContent = "Send message";
   }
 });
 
-copyButton.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(responseNode.textContent);
-    copyButton.textContent = "Copied";
-    setTimeout(() => { copyButton.textContent = "Copy"; }, 1200);
-  } catch {
-    showError("Clipboard access is unavailable in this app context.");
-  }
+newChatButton.addEventListener("click", () => {
+  messages = [];
+  saveMessages();
+  renderConversation();
+  showError("");
+  promptInput.focus();
 });
 
 initialize();
