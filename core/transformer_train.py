@@ -55,10 +55,12 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     text = corpus_path.read_text(encoding="utf-8")
     if not text.strip():
         raise ValueError("Training corpus is empty")
-    tokenizer = BytePairTokenizer().fit(text, vocab_size=vocab_size)
-    tokens = tokenizer.encode(text)
-    split_at = int(len(tokens) * (1.0 - validation_fraction))
-    train_tokens, validation_tokens = tokens[:split_at], tokens[split_at:]
+    split_at = int(len(text) * (1.0 - validation_fraction))
+    training_text, validation_text = text[:split_at], text[split_at:]
+    tokenizer = BytePairTokenizer().fit(training_text, vocab_size=vocab_size)
+    train_tokens = tokenizer.encode(training_text)
+    validation_tokens = tokenizer.encode(validation_text)
+    tokens = train_tokens + validation_tokens
     if len(train_tokens) < context_length + 1 or len(validation_tokens) < context_length + 1:
         raise ValueError("Corpus is too short for the selected context and validation split")
     config = TransformerConfig(vocab_size=tokenizer.vocab_size,
