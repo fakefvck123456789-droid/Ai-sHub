@@ -48,8 +48,10 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
           resume_from: Path | None = None, bpe_training_bytes: int = 100_000) -> dict:
     if steps < 1 or batch_size < 1 or context_length < 1 or learning_rate <= 0:
         raise ValueError("steps, batch_size, context_length and learning_rate must be positive")
-    if vocab_size < 256 or eval_interval < 1 or eval_batches < 1 or bpe_training_bytes < 1:
+    if vocab_size < 256 or eval_interval < 1 or eval_batches < 1:
         raise ValueError("vocab_size must be >=256; evaluation settings must be positive")
+    if bpe_training_bytes < 1:
+        raise ValueError("bpe_training_bytes must be positive")
     if not 0.01 <= validation_fraction <= 0.5:
         raise ValueError("validation_fraction must be between 0.01 and 0.5")
     random.seed(seed)
