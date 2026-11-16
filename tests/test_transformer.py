@@ -42,6 +42,19 @@ class TransformerTests(unittest.TestCase):
         layer = RMSNorm(12)
         self.assertEqual(tuple(layer(torch.randn(2, 3, 12)).shape), (2, 3, 12))
 
+    def test_future_tokens_do_not_change_earlier_logits(self):
+        model = self.make_model()
+        first = torch.tensor([[1, 2, 3, 4]])
+        changed = torch.tensor([[1, 2, 9, 8]])
+        with torch.no_grad():
+            a, _ = model(first)
+            b, _ = model(changed)
+        self.assertTrue(torch.allclose(a[:, :2], b[:, :2], atol=1e-6))
+
+    def test_input_embedding_and_output_head_are_tied(self):
+        model = self.make_model()
+        self.assertIs(model.token_embedding.weight, model.lm_head.weight)
+
 
 if __name__ == "__main__":
     unittest.main()
