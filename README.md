@@ -30,7 +30,8 @@ Python 3.10+ is recommended. Install a PyTorch build compatible with your operat
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+# Linux CPU build:
+python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
