@@ -19,6 +19,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.PriorityQueue;
+import java.util.Comparator;
 import java.util.Random;
 
 final class CoreOnnxRuntime implements AutoCloseable {
@@ -136,6 +140,7 @@ final class CoreOnnxRuntime implements AutoCloseable {
     private static final class ByteBpe {
         private final List<int[]> merges = new ArrayList<>();
         private final List<byte[]> expansions = new ArrayList<>();
+        private final Map<Long, Integer> mergeRanks = new HashMap<>();
 
         ByteBpe(String json) throws Exception {
             JSONObject root = new JSONObject(json);
@@ -148,6 +153,7 @@ final class CoreOnnxRuntime implements AutoCloseable {
                 if (left < 0 || right < 0 || left >= expansions.size() || right >= expansions.size())
                     throw new IllegalArgumentException("Invalid BPE merge");
                 merges.add(new int[]{left, right});
+                mergeRanks.put(pairKey(left, right), i);
                 byte[] a = expansions.get(left), b = expansions.get(right);
                 byte[] combined = Arrays.copyOf(a, a.length + b.length);
                 System.arraycopy(b, 0, combined, a.length, b.length);
@@ -157,27 +163,62 @@ final class CoreOnnxRuntime implements AutoCloseable {
 
         int vocabSize() { return expansions.size(); }
 
+        private static long pairKey(int left, int right) {
+            return (((long) left) << 32) | (right & 0xffffffffL);
+        }
+
+        private static final class Candidate {
+            final int rank, index, leftToken, rightToken;
+            Candidate(int rank, int index, int leftToken, int rightToken) {
+                this.rank = rank; this.index = index;
+                this.leftToken = leftToken; this.rightToken = rightToken;
+            }
+        }
+
         List<Integer> encode(String text) {
             byte[] raw = text.getBytes(StandardCharsets.UTF_8);
-            List<Integer> ids = new ArrayList<>(raw.length);
-            for (byte value : raw) ids.add(value & 0xff);
-            while (ids.size() > 1) {
-                int bestRank = Integer.MAX_VALUE, bestIndex = -1;
-                for (int i = 0; i + 1 < ids.size(); i++) {
-                    int left = ids.get(i), right = ids.get(i + 1);
-                    for (int rank = 0; rank < merges.size(); rank++) {
-                        int[] pair = merges.get(rank);
-                        if (pair[0] == left && pair[1] == right) {
-                            if (rank < bestRank) { bestRank = rank; bestIndex = i; }
-                            break;
-                        }
-                    }
-                }
-                if (bestIndex < 0) break;
-                ids.set(bestIndex, 256 + bestRank);
-                ids.remove(bestIndex + 1);
+            int count = raw.length;
+            List<Integer> output = new ArrayList<>(count);
+            if (count == 0) return output;
+            int[] values = new int[count], previous = new int[count], next = new int[count];
+            boolean[] alive = new boolean[count];
+            for (int i = 0; i < count; i++) {
+                values[i] = raw[i] & 0xff;
+                previous[i] = i - 1;
+                next[i] = i + 1 < count ? i + 1 : -1;
+                alive[i] = true;
             }
-            return ids;
+            PriorityQueue<Candidate> queue = new PriorityQueue<>(
+                    Comparator.comparingInt((Candidate item) -> item.rank)
+                              .thenComparingInt(item -> item.index));
+            for (int i = 0; i + 1 < count; i++) pushPair(queue, values, next, alive, i);
+            while (!queue.isEmpty()) {
+                Candidate candidate = queue.poll();
+                int left = candidate.index;
+                if (!alive[left]) continue;
+                int right = next[left];
+                if (right < 0 || !alive[right]) continue;
+                if (values[left] != candidate.leftToken || values[right] != candidate.rightToken) continue;
+                values[left] = 256 + candidate.rank;
+                alive[right] = false;
+                next[left] = next[right];
+                if (next[left] >= 0) previous[next[left]] = left;
+                pushPair(queue, values, next, alive, previous[left]);
+                pushPair(queue, values, next, alive, left);
+            }
+            for (int index = 0; index >= 0; index = next[index])
+                if (alive[index]) output.add(values[index]);
+            return output;
+        }
+
+        private void pushPair(PriorityQueue<Candidate> queue, int[] values,
+                              int[] next, boolean[] alive, int left) {
+            if (left < 0 || !alive[left]) return;
+            int right = next[left];
+            if (right < 0 || !alive[right]) return;
+            Integer rank = mergeRanks.get(pairKey(values[left], values[right]));
+            if (rank != null)
+                queue.add(new Candidate(rank, left, values[left], values[right]));
         }
 
         String decode(List<Integer> ids) {
