@@ -55,12 +55,12 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
           context_length: int = 128, device: str = "cpu", seed: int = 42,
           vocab_size: int = 512, eval_interval: int = 100,
           eval_batches: int = 10, validation_fraction: float = 0.1,
-          resume_from: Path | None = None, bpe_training_bytes: int = 100_000) -> dict:
+          resume_from: Path | None = None, bpe_training_bytes: int | None = None) -> dict:
     if steps < 1 or batch_size < 1 or context_length < 1 or learning_rate <= 0:
         raise ValueError("steps, batch_size, context_length and learning_rate must be positive")
     if vocab_size < 256 or eval_interval < 1 or eval_batches < 1:
         raise ValueError("vocab_size must be >=256; evaluation settings must be positive")
-    if bpe_training_bytes < 1:
+    if bpe_training_bytes is not None and bpe_training_bytes < 1:
         raise ValueError("bpe_training_bytes must be positive")
     if not 0.01 <= validation_fraction <= 0.5:
         raise ValueError("validation_fraction must be between 0.01 and 0.5")
@@ -74,6 +74,8 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     training_text, validation_text = text[:split_at], text[split_at:]
     base_config = load_base_config()
     tokenizer_config = base_config["tokenizer"]
+    if bpe_training_bytes is None:
+        bpe_training_bytes = int(tokenizer_config["max_training_bytes"])
     tokenizer = BytePairTokenizer(
         min_frequency=int(tokenizer_config["minimum_pair_frequency"]),
         max_training_bytes=bpe_training_bytes,
@@ -168,7 +170,7 @@ def main():
     parser.add_argument("--context-length", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--vocab-size", type=int, default=512)
-    parser.add_argument("--bpe-training-bytes", type=int, default=100_000)
+    parser.add_argument("--bpe-training-bytes", type=int, default=None)
     parser.add_argument("--eval-interval", type=int, default=100)
     parser.add_argument("--eval-batches", type=int, default=10)
     parser.add_argument("--validation-fraction", type=float, default=0.1)
