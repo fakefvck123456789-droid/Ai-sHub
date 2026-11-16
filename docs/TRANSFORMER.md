@@ -15,6 +15,10 @@ The current implementation in `core/transformer.py` is a decoder-only autoregres
 
 The target architecture is configured in `configs/core_0_1.json`: 4 blocks, 4 heads, 256 embedding dimensions, 1024 feed-forward dimensions, and 512 context positions. The training CLI allows a shorter context for smoke tests and constrained experiments.
 
+## Local model families
+
+The local router accepts registered checkpoints with explicit capability labels and validates tokenizer/model vocabulary compatibility. The Core text checkpoint is currently the only shipped model. A future Code, Vision, Image, Voice, or Motion model must provide its own trained checkpoint and a real implementation of its declared capability before it is registered; a capability label alone is not a model.
+
 ## Tokenizer
 
 `core/bpe_tokenizer.py` implements byte-level BPE. The 256 base IDs represent individual UTF-8 bytes; learned merge IDs start at 256. This makes unseen scripts and symbols representable without an unknown-token fallback. It uses ranked heap-based merging for encoding in 8 KB chunks and learns merges from a bounded, evenly spaced sample of up to 100 KB by default (adjustable with `--bpe-training-bytes`). It remains a reference implementation, not an optimized production tokenizer.
