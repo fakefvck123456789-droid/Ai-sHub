@@ -32,6 +32,23 @@ class TransformerTrainingTests(unittest.TestCase):
             generated = generate(checkpoint, "Ai", max_new_tokens=2, top_k=5)
             self.assertTrue(generated.startswith("Ai"))
 
+
+    def test_resume_continues_from_saved_step(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / "tiny.txt"
+            checkpoint = root / "checkpoint.pt"
+            corpus.write_text(("Ai'Hub builds independent models. " * 20), encoding="utf-8")
+            train(corpus, checkpoint, steps=1, batch_size=2,
+                  context_length=8, vocab_size=256, eval_batches=1)
+            resumed = train(corpus, checkpoint, steps=2, batch_size=2,
+                            context_length=8, vocab_size=256, eval_batches=1,
+                            resume_from=checkpoint)
+            payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+            self.assertEqual(resumed["steps"], 2)
+            self.assertEqual(payload["training"]["completed_steps"], 2)
+            self.assertIn("optimizer_state_dict", payload)
+
     def test_rejects_too_short_validation_split(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
