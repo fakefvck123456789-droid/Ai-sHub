@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from pathlib import Path
@@ -56,6 +57,7 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     text = corpus_path.read_text(encoding="utf-8")
     if not text.strip():
         raise ValueError("Training corpus is empty")
+    corpus_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
     split_at = int(len(text) * (1.0 - validation_fraction))
     training_text, validation_text = text[:split_at], text[split_at:]
     tokenizer = BytePairTokenizer().fit(training_text, vocab_size=vocab_size)
@@ -73,6 +75,8 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         checkpoint = torch.load(resume_from, map_location=device, weights_only=True)
         if checkpoint.get("format_version") != 1 or checkpoint.get("project") != "Ai'Hub Core 0.1":
             raise ValueError("Resume file is not a supported Ai'Hub checkpoint")
+        if checkpoint.get("corpus_sha256") != corpus_sha256:
+            raise ValueError("Resume checkpoint was created from a different corpus")
         if checkpoint.get("config") != model.config_dict():
             raise ValueError("Resume checkpoint model configuration does not match this run")
         if checkpoint.get("tokenizer") != tokenizer.to_dict():
@@ -81,6 +85,10 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
             raise ValueError("Resume checkpoint does not contain optimizer state")
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        for group in optimizer.param_groups:
+            group["lr"] = learning_rate
+        if checkpoint.get("training", {}).get("validation_fraction") != validation_fraction:
+            raise ValueError("Resume checkpoint validation split does not match this run")
         start_step = int(checkpoint.get("training", {}).get("completed_steps", 0))
         if steps <= start_step:
             raise ValueError("steps must be greater than the checkpoint's completed_steps")
@@ -107,6 +115,7 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         "format_version": 1,
         "project": "Ai'Hub Core 0.1",
         "status": "experimental_unvalidated_training_run",
+        "corpus_sha256": corpus_sha256,
         "config": model.config_dict(),
         "tokenizer": tokenizer.to_dict(),
         "model_state_dict": model.state_dict(),
