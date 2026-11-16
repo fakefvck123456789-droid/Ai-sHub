@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 import torch
+from torch.nn import functional as F
 
 from core.bpe_tokenizer import BytePairTokenizer
 from core.transformer import AiHubTransformer, TransformerConfig
@@ -34,13 +35,23 @@ def evaluate_checkpoint(checkpoint_path: Path, text_path: Path,
     total_nll = 0.0
     total_targets = 0
     context = config.context_length
-    for start in range(0, len(tokens) - 1, context):
-        end = min(start + context, len(tokens) - 1)
-        x = torch.tensor([tokens[start:end]], dtype=torch.long, device=device)
-        y = torch.tensor([tokens[start + 1:end + 1]], dtype=torch.long, device=device)
-        _, loss = model(x, y)
-        count = end - start
-        total_nll += float(loss.cpu()) * count
+    target_block = max(1, context // 2)
+    prefix_length = context - target_block + 1
+    for target_start in range(1, len(tokens), target_block):
+        target_end = min(target_start + target_block, len(tokens))
+        input_start = max(0, target_start - prefix_length)
+        x = torch.tensor([tokens[input_start:target_end - 1]],
+                         dtype=torch.long, device=device)
+        y = torch.tensor([tokens[input_start + 1:target_end]],
+                         dtype=torch.long, device=device)
+        offset = target_start - 1 - input_start
+        logits, _ = model(x)
+        selected_logits = logits[:, offset:, :].contiguous()
+        selected_targets = y[:, offset:].contiguous()
+        count = target_end - target_start
+        nll = F.cross_entropy(selected_logits.view(-1, selected_logits.size(-1)),
+                              selected_targets.view(-1), reduction="sum")
+        total_nll += float(nll.cpu())
         total_targets += count
 
     average_loss = total_nll / total_targets
