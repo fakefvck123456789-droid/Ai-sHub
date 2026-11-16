@@ -36,9 +36,33 @@ python -m core.transformer_generate \
 
 The included synthetic corpus is for pipeline verification only. It is not a meaningful language-model training dataset. A tiny training loss or generated string does not establish useful model quality.
 
+## Training controls
+
+The trainer supports gradient accumulation, linear warmup, and cosine decay to a configurable minimum learning-rate ratio:
+
+```bash
+python -m core.transformer_train --input data/prepared/corpus.txt \
+  --output artifacts/core-0.1.pt --steps 10000 --context-length 128 \
+  --batch-size 2 --gradient-accumulation-steps 4 \
+  --warmup-steps 300 --min-lr-ratio 0.1
+```
+
+The effective batch size is `batch-size × gradient-accumulation-steps`. The scheduler's `--steps` value is the target total optimizer-step count, including when resuming. The saved checkpoint records the effective batch size and scheduler settings.
+
+## Local performance benchmark
+
+After training a checkpoint, measure generation latency and throughput on the machine where it will run:
+
+```bash
+python -m core.transformer_benchmark --checkpoint artifacts/core-0.1.pt \
+  --prompt "Ai'Hub" --new-tokens 32 --warmup 1 --repeats 5 --device cpu
+```
+
+The report includes mean/median latency, generated tokens per second, parameter count, and process peak RSS where the platform exposes it. This is a local measurement, not a published device benchmark.
+
 ## Known gaps
 
-- The trainer uses a deterministic tail slice as held-out validation and reports validation loss during training. The standalone `core.transformer_eval` CLI computes next-token loss and perplexity on a separate corpus. It supports checkpoint resume with optimizer and RNG state, and verifies the original corpus and validation split. Learning-rate scheduling, mixed precision, gradient accumulation, and distributed training are not implemented yet.
+- The trainer uses a deterministic tail slice as held-out validation and reports validation loss during training. The standalone `core.transformer_eval` CLI computes next-token loss and perplexity on a separate corpus. It supports checkpoint resume with optimizer and RNG state, and verifies the original corpus and validation split. Gradient accumulation and warmup-plus-cosine learning-rate decay are implemented; mixed precision and distributed training remain future work.
 - No large, curated, legally documented corpus is bundled.
 - No pretrained weights or benchmark results are supplied.
 - Mobile PyTorch availability is platform-dependent; CPU training on an Android phone is not guaranteed.
