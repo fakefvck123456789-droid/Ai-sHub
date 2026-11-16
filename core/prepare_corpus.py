@@ -19,9 +19,14 @@ def prepare_corpus(input_dir: Path, sources_path: Path, output_path: Path,
     sources = json.loads(sources_path.read_text(encoding="utf-8"))
     if not isinstance(sources, dict):
         raise ValueError("Source manifest must be a JSON object keyed by relative file path")
-    files = sorted(path for path in input_dir.rglob("*.txt") if path.is_file())
+    files = sorted(path for path in input_dir.rglob("*.txt") if path.is_file() and not path.is_symlink())
     if not files:
         raise ValueError(f"No .txt files found in {input_dir}")
+
+    manifest_path = manifest_output or output_path.with_name(output_path.name + ".manifest.json")
+    for destination in (output_path.resolve(), manifest_path.resolve()):
+        if destination == input_dir or input_dir in destination.parents:
+            raise ValueError("Output files must be outside the input directory")
 
     seen: set[str] = set()
     corpus_parts: list[str] = []
@@ -70,6 +75,8 @@ def prepare_corpus(input_dir: Path, sources_path: Path, output_path: Path,
             "duplicate_paragraphs_removed": duplicates,
         })
 
+    if not corpus_parts:
+        raise ValueError("No non-empty paragraphs were found in the licensed source files")
     corpus = "\n\n".join(corpus_parts).strip() + "\n"
     encoded = corpus.encode("utf-8")
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,7 +91,6 @@ def prepare_corpus(input_dir: Path, sources_path: Path, output_path: Path,
         "duplicate_paragraphs_removed": total_duplicates,
         "sources": source_records,
     }
-    manifest_path = manifest_output or output_path.with_name(output_path.name + ".manifest.json")
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
                              encoding="utf-8")
