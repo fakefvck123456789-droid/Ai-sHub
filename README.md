@@ -41,6 +41,17 @@ python -m core.train --input data/sample.txt --output artifacts/ngram.json
 python -m core.server --model artifacts/ngram.json
 ```
 
+
+## Prepare a licensed training corpus
+
+Before training on external text, prepare a source manifest and run the provenance-gated cleaner:
+
+```bash
+python -m core.prepare_corpus --input-dir data/raw --sources data/sources.json --output data/prepared/corpus.txt
+```
+
+Every input text file must have a source URL, exact license name, and explicit `training_allowed: true` entry. The script normalizes Unicode, deduplicates paragraphs, and writes a SHA-256 provenance manifest. It cannot make legal determinations; verify each license yourself. See [corpus provenance guidance](data/CORPUS_SOURCES.md).
+
 ## Train and run Core Transformer
 
 The trainer now uses the custom byte-level BPE tokenizer. The included sample corpus is synthetic and far too small to produce a useful language model; it is suitable only for a short code-path smoke test.
