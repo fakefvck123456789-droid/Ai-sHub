@@ -23,14 +23,33 @@ def make_batches(tokens: list[int], context: int, batch_size: int, device: str):
     return x.to(device), y.to(device)
 
 
+@torch.no_grad()
+def evaluate(model: AiHubTransformer, tokens: list[int], context: int,
+             batch_size: int, batches: int, device: str) -> float:
+    was_training = model.training
+    model.eval()
+    losses = []
+    try:
+        for _ in range(batches):
+            x, y = make_batches(tokens, context, batch_size, device)
+            _, loss = model(x, y)
+            losses.append(float(loss.cpu()))
+    finally:
+        model.train(was_training)
+    return sum(losses) / len(losses)
+
+
 def train(corpus_path: Path, output_path: Path, steps: int = 1000,
           batch_size: int = 8, learning_rate: float = 3e-4,
           context_length: int = 128, device: str = "cpu", seed: int = 42,
-          vocab_size: int = 512) -> dict:
+          vocab_size: int = 512, eval_interval: int = 100,
+          eval_batches: int = 10, validation_fraction: float = 0.1) -> dict:
     if steps < 1 or batch_size < 1 or context_length < 1 or learning_rate <= 0:
         raise ValueError("steps, batch_size, context_length and learning_rate must be positive")
-    if vocab_size < 256:
-        raise ValueError("vocab_size must be at least 256 for byte-level BPE")
+    if vocab_size < 256 or eval_interval < 1 or eval_batches < 1:
+        raise ValueError("vocab_size must be >=256; evaluation settings must be positive")
+    if not 0.01 <= validation_fraction <= 0.5:
+        raise ValueError("validation_fraction must be between 0.01 and 0.5")
     random.seed(seed)
     torch.manual_seed(seed)
     text = corpus_path.read_text(encoding="utf-8")
@@ -38,22 +57,28 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         raise ValueError("Training corpus is empty")
     tokenizer = BytePairTokenizer().fit(text, vocab_size=vocab_size)
     tokens = tokenizer.encode(text)
-    if len(tokens) < context_length + 1:
-        raise ValueError("Corpus is too short for the selected context length")
+    split_at = int(len(tokens) * (1.0 - validation_fraction))
+    train_tokens, validation_tokens = tokens[:split_at], tokens[split_at:]
+    if len(train_tokens) < context_length + 1 or len(validation_tokens) < context_length + 1:
+        raise ValueError("Corpus is too short for the selected context and validation split")
     config = TransformerConfig(vocab_size=tokenizer.vocab_size,
                                context_length=context_length)
     model = AiHubTransformer(config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     model.train()
-    last_loss = None
-    for _ in range(steps):
-        x, y = make_batches(tokens, context_length, batch_size, device)
+    last_train_loss = None
+    validation_loss = None
+    for step in range(1, steps + 1):
+        x, y = make_batches(train_tokens, context_length, batch_size, device)
         _, loss = model(x, y)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
-        last_loss = float(loss.detach().cpu())
+        last_train_loss = float(loss.detach().cpu())
+        if step % eval_interval == 0 or step == steps:
+            validation_loss = evaluate(model, validation_tokens, context_length,
+                                       batch_size, eval_batches, device)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save({
         "format_version": 1,
@@ -64,12 +89,15 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
         "model_state_dict": model.state_dict(),
         "training": {"steps": steps, "batch_size": batch_size,
                      "learning_rate": learning_rate, "context_length": context_length,
-                     "seed": seed, "final_training_loss": last_loss},
+                     "seed": seed, "final_training_loss": last_train_loss,
+                     "validation_loss": validation_loss,
+                     "validation_fraction": validation_fraction},
     }, output_path)
-    return {"steps": steps, "tokens": len(tokens), "vocabulary": tokenizer.vocab_size,
-            "learned_merges": len(tokenizer.merges), "final_training_loss": last_loss,
-            "output": str(output_path), "device": device,
-            "parameters": sum(p.numel() for p in model.parameters())}
+    return {"steps": steps, "tokens": len(tokens), "training_tokens": len(train_tokens),
+            "validation_tokens": len(validation_tokens), "vocabulary": tokenizer.vocab_size,
+            "learned_merges": len(tokenizer.merges), "final_training_loss": last_train_loss,
+            "validation_loss": validation_loss, "output": str(output_path),
+            "device": device, "parameters": sum(p.numel() for p in model.parameters())}
 
 
 def main():
@@ -81,12 +109,16 @@ def main():
     parser.add_argument("--context-length", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--vocab-size", type=int, default=512)
+    parser.add_argument("--eval-interval", type=int, default=100)
+    parser.add_argument("--eval-batches", type=int, default=10)
+    parser.add_argument("--validation-fraction", type=float, default=0.1)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     stats = train(args.input, args.output, args.steps, args.batch_size,
                   args.learning_rate, args.context_length, args.device, args.seed,
-                  args.vocab_size)
+                  args.vocab_size, args.eval_interval, args.eval_batches,
+                  args.validation_fraction)
     print(json.dumps(stats, indent=2))
 
 
