@@ -4,6 +4,8 @@ An independent, research-first AI software and model ecosystem. Ai'Hub is design
 
 ## Current status
 
+See [implementation status and release gates](docs/STATUS.md) for what is implemented and what remains before a real Core model release.
+
 **Foundation stage — Ai'Hub Core 0.1 architecture and training pipeline are implemented; no trained release model exists.**
 
 The repository contains:
