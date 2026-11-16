@@ -1,8 +1,9 @@
-"""Deterministic byte-pair encoding tokenizer trained from UTF-8 text."""
+"""Deterministic byte-level BPE tokenizer trained from UTF-8 text."""
 from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+import heapq
 
 
 @dataclass
@@ -10,12 +11,15 @@ class BytePairTokenizer:
     """Byte-level BPE: IDs 0..255 are bytes; learned merges follow them."""
     merges: list[tuple[int, int]] = field(default_factory=list)
     min_frequency: int = 2
+    max_training_bytes: int = 100_000
     _ranks: dict[tuple[int, int], int] = field(default_factory=dict, init=False, repr=False)
     _expansions: list[bytes] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self):
         if self.min_frequency < 1:
             raise ValueError("min_frequency must be positive")
+        if self.max_training_bytes < 1:
+            raise ValueError("max_training_bytes must be positive")
         self._rebuild()
 
     @property
@@ -33,7 +37,17 @@ class BytePairTokenizer:
     def fit(self, text: str, vocab_size: int = 512) -> "BytePairTokenizer":
         if vocab_size < 256:
             raise ValueError("vocab_size must be at least 256 for byte-level BPE")
-        sequence = list(text.encode("utf-8"))
+        raw = text.encode("utf-8")
+        if len(raw) > self.max_training_bytes:
+            chunks = min(8, self.max_training_bytes)
+            chunk_size = max(1, self.max_training_bytes // chunks)
+            last_start = len(raw) - chunk_size
+            starts = ([i * last_start // (chunks - 1) for i in range(chunks)]
+                      if chunks > 1 else [0])
+            sample = b"\n".join(raw[start:start + chunk_size] for start in starts)
+        else:
+            sample = raw
+        sequence = list(sample)
         merges: list[tuple[int, int]] = []
         next_id = 256
         while next_id < vocab_size and len(sequence) > 1:
@@ -60,19 +74,56 @@ class BytePairTokenizer:
         return self
 
     def encode(self, text: str) -> list[int]:
-        sequence = list(text.encode("utf-8"))
-        for rank, pair in enumerate(self.merges):
-            merged: list[int] = []
-            index = 0
-            while index < len(sequence):
-                if index + 1 < len(sequence) and (sequence[index], sequence[index + 1]) == pair:
-                    merged.append(256 + rank)
-                    index += 2
-                else:
-                    merged.append(sequence[index])
-                    index += 1
-            sequence = merged
-        return sequence
+        values = list(text.encode("utf-8"))
+        count = len(values)
+        if count < 2 or not self.merges:
+            return values
+
+        previous = [index - 1 for index in range(count)]
+        following = [index + 1 for index in range(count)]
+        following[-1] = -1
+        alive = [True] * count
+        heap = []
+
+        def push_pair(left_index: int):
+            if left_index < 0 or not alive[left_index]:
+                return
+            right_index = following[left_index]
+            if right_index < 0 or not alive[right_index]:
+                return
+            pair = (values[left_index], values[right_index])
+            rank = self._ranks.get(pair)
+            if rank is not None:
+                heapq.heappush(heap, (rank, left_index, pair[0], pair[1]))
+
+        for index in range(count - 1):
+            push_pair(index)
+
+        while heap:
+            rank, left_index, left_token, right_token = heapq.heappop(heap)
+            if not alive[left_index]:
+                continue
+            right_index = following[left_index]
+            if right_index < 0 or not alive[right_index]:
+                continue
+            if values[left_index] != left_token or values[right_index] != right_token:
+                continue
+            values[left_index] = 256 + rank
+            alive[right_index] = False
+            next_index = following[right_index]
+            following[left_index] = next_index
+            if next_index >= 0:
+                previous[next_index] = left_index
+            push_pair(previous[left_index])
+            push_pair(left_index)
+
+        output = []
+        index = 0
+        while index >= 0:
+            if alive[index]:
+                output.append(values[index])
+            index = following[index]
+        return output
 
     def decode(self, ids: list[int]) -> str:
         data = bytearray()
@@ -84,6 +135,7 @@ class BytePairTokenizer:
 
     def to_dict(self) -> dict:
         return {"type": "byte_bpe", "min_frequency": self.min_frequency,
+                "max_training_bytes": self.max_training_bytes,
                 "merges": [list(pair) for pair in self.merges]}
 
     @classmethod
@@ -91,4 +143,5 @@ class BytePairTokenizer:
         if payload.get("type") != "byte_bpe" or not isinstance(payload.get("merges"), list):
             raise ValueError("Unsupported tokenizer format")
         return cls(merges=[tuple(pair) for pair in payload["merges"]],
-                   min_frequency=int(payload.get("min_frequency", 2)))
+                   min_frequency=int(payload.get("min_frequency", 2)),
+                   max_training_bytes=int(payload.get("max_training_bytes", 100_000)))
