@@ -62,6 +62,14 @@ python -m core.transformer_generate --checkpoint artifacts/core-0.1.pt --prompt 
 python -m core.transformer_server --checkpoint artifacts/core-0.1.pt --host 127.0.0.1 --port 8766
 ```
 
+To evaluate on a separate held-out text file (create `data/heldout.txt` from data not used for training):
+
+```bash
+python -m core.transformer_eval --checkpoint artifacts/core-0.1.pt --input data/heldout.txt
+```
+
+This reports average next-token loss and perplexity. Compare runs only when they use the same evaluation corpus and tokenizer; a tiny or overlapping corpus is not a meaningful benchmark.
+
 The canonical architecture is 4 layers, 4 heads, 256-dimensional embeddings, 1024-dimensional feed-forward layers, and a 512-token context. The training CLI allows shorter contexts for smoke tests and constrained experiments. Training cost rises quickly with context, batch size, and corpus size.
 
 For real experiments, supply a legally usable, sufficiently large corpus and record its origin and license in `data/CORPUS_SOURCES.md`. Train and resume against the exact same corpus file:
