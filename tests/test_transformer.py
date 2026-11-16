@@ -2,9 +2,11 @@ import unittest
 
 try:
     import torch
-    from core.transformer import AiHubTransformer, RMSNorm, TransformerConfig, apply_rope
 except ImportError:
     torch = None
+
+if torch is not None:
+    from core.transformer import AiHubTransformer, RMSNorm, TransformerConfig, apply_rope
 
 
 @unittest.skipIf(torch is None, "PyTorch is required for Transformer tests")
