@@ -55,6 +55,19 @@ The canonical architecture is 4 layers, 4 heads, 256-dimensional embeddings, 102
 
 For real experiments, supply a legally usable, sufficiently large corpus and record its origin and license in `data/CORPUS_SOURCES.md`. See [Transformer implementation notes](docs/TRANSFORMER.md).
 
+
+## Mobile app (PWA)
+
+A mobile-first installable web app is included in `app/`. It is a PWA, not a compiled native APK. It communicates with the local Transformer server only; no external AI API is used.
+
+With the Transformer server running in one terminal, serve the app in another:
+
+```bash
+python -m http.server 8080 --bind 127.0.0.1 --directory app
+```
+
+Open `http://127.0.0.1:8080` on the same device. On Android, use the browser's **Add to Home screen** / **Install app** option if available. See [app setup](app/README.md). The API restricts browser CORS to the two local origins on port 8080.
+
 ## Android / Termux
 
 The bigram prototype can run with standard Python. PyTorch installation support varies by Android device, Python version, and available package builds; `pip install -r requirements.txt` is not guaranteed to work in Termux. For Transformer training, use a supported Linux, Windows, or macOS CPU environment unless a compatible Android PyTorch build has been independently verified.
