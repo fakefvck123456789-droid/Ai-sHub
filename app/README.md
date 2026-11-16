@@ -26,6 +26,8 @@ This is an installable, mobile-first Progressive Web App (PWA), not a compiled n
 
 6. Open `http://127.0.0.1:8080` in the Android browser. Use the browser menu's **Add to Home screen** / **Install app** action if available.
 
+The app loads the available local text-generation models from the server's `/models` endpoint and includes the selected model ID in generation requests. The registry explicitly reports that external fallback is disabled.
+
 The API allows browser requests only from `http://127.0.0.1:8080` and `http://localhost:8080` by default. Keep both servers bound to loopback. Do not bind the inference API to a public interface without authentication and a security review.
 
 ## Local computer
