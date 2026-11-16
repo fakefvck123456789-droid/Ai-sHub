@@ -60,6 +60,8 @@ The trainer now uses the custom byte-level BPE tokenizer. The included sample co
 python -m core.transformer_train --input data/sample.txt --output artifacts/core-0.1.pt --steps 2 --batch-size 2 --context-length 16 --vocab-size 256
 python -m core.transformer_generate --checkpoint artifacts/core-0.1.pt --prompt "Ai'Hub" --max-new-tokens 20
 python -m core.transformer_server --checkpoint artifacts/core-0.1.pt --host 127.0.0.1 --port 8766
+# Continue training to a total of 2,000 steps from the saved checkpoint:
+python -m core.transformer_train --input data/prepared/corpus.txt --output artifacts/core-0.1.pt --steps 2000 --resume artifacts/core-0.1.pt
 ```
 
 The canonical architecture is 4 layers, 4 heads, 256-dimensional embeddings, 1024-dimensional feed-forward layers, and a 512-token context. The training CLI allows shorter contexts for smoke tests and constrained experiments. Training cost rises quickly with context, batch size, and corpus size.
