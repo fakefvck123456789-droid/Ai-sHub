@@ -43,6 +43,13 @@ class TransformerServerTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["model"], "Ai'Hub Core 0.1 Transformer")
 
+    def test_models_lists_only_local_core(self):
+        with urlopen(self.base + "/models", timeout=5) as response:
+            payload = json.loads(response.read())
+        self.assertFalse(payload["external_fallback"])
+        self.assertEqual([item["id"] for item in payload["data"]], ["core-0.1"])
+        self.assertIn("text_generation", payload["data"][0]["capabilities"])
+
     def test_generate(self):
         request = Request(self.base + "/generate",
                           data=json.dumps({"prompt": "hello", "max_new_tokens": 2,
