@@ -19,13 +19,25 @@ class TransformerTrainingTests(unittest.TestCase):
             checkpoint = root / "checkpoint.pt"
             corpus.write_text(("Ai'Hub builds independent models. " * 20), encoding="utf-8")
             stats = train(corpus, checkpoint, steps=1, batch_size=2,
-                          context_length=8, vocab_size=256)
+                          context_length=8, vocab_size=256, eval_batches=2)
             self.assertTrue(checkpoint.exists())
             self.assertEqual(stats["steps"], 1)
+            self.assertGreater(stats["training_tokens"], 0)
+            self.assertGreater(stats["validation_tokens"], 0)
+            self.assertTrue(torch.isfinite(torch.tensor(stats["validation_loss"])).item())
             model, tokenizer = load_checkpoint(checkpoint)
             self.assertEqual(model.config.vocab_size, tokenizer.vocab_size)
             generated = generate(checkpoint, "Ai", max_new_tokens=2, top_k=5)
             self.assertTrue(generated.startswith("Ai"))
+
+    def test_rejects_too_short_validation_split(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / "short.txt"
+            corpus.write_text("too short", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                train(corpus, root / "unused.pt", steps=1, context_length=8,
+                      vocab_size=256)
 
 
 if __name__ == "__main__":
