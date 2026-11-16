@@ -73,8 +73,8 @@ class BytePairTokenizer:
         self._rebuild()
         return self
 
-    def encode(self, text: str) -> list[int]:
-        values = list(text.encode("utf-8"))
+    def _encode_bytes(self, raw: bytes) -> list[int]:
+        values = list(raw)
         count = len(values)
         if count < 2 or not self.merges:
             return values
@@ -124,6 +124,17 @@ class BytePairTokenizer:
                 output.append(values[index])
             index = following[index]
         return output
+
+    def encode(self, text: str) -> list[int]:
+        raw = text.encode("utf-8")
+        if not raw:
+            return []
+        # Bound temporary linked-list and heap allocations for large corpora.
+        result = []
+        chunk_bytes = 8192
+        for start in range(0, len(raw), chunk_bytes):
+            result.extend(self._encode_bytes(raw[start:start + chunk_bytes]))
+        return result
 
     def decode(self, ids: list[int]) -> str:
         data = bytearray()
