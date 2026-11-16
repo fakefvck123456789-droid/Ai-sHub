@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111827">
-  <meta name="description" content="Local interface for your self-hosted Ai'Hub Core model.">
+  <meta name="description" content="Ai'Hub Core — experimental on-device language model.">
   <title>Ai'Hub</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -14,85 +14,38 @@
   <main class="shell">
     <header class="topbar">
       <div class="brand-mark" aria-hidden="true">AI</div>
-      <div>
-        <p class="eyebrow">INDEPENDENT MODEL LAB</p>
-        <h1>Ai'Hub</h1>
-      </div>
-      <span class="local-tag">LOCAL</span>
+      <div><p class="eyebrow">INDEPENDENT MODEL LAB</p><h1>Ai'Hub</h1></div>
+      <span class="local-tag">ON-DEVICE</span>
     </header>
-
     <section class="intro">
       <h2>Your model. Your device. Your control.</h2>
-      <p>This interface sends prompts only to the local Ai'Hub server address configured below.</p>
+      <p>Prompts are processed locally on this Android device. No API key, account, or internet connection is required.</p>
     </section>
-
     <section class="panel connection-panel" aria-labelledby="connection-title">
-      <div class="section-heading">
-        <h3 id="connection-title">Model connection</h3>
-        <span id="status" class="status" role="status">Checking…</span>
-      </div>
-      <label for="endpoint">Local server URL</label>
-      <div class="endpoint-row">
-        <input id="endpoint" type="url" value="http://127.0.0.1:8766" autocomplete="url" spellcheck="false">
-        <button id="check" class="secondary" type="button">Check</button>
-      </div>
-      <p class="hint">Start <code>core.transformer_server</code> in Termux or on your computer first.</p>
+      <div class="section-heading"><h3 id="connection-title">Device runtime</h3><span id="status" class="status" role="status">Loading model…</span></div>
+      <p class="hint">The bundled Core prototype runs offline inside the app.</p>
     </section>
-
     <section class="panel composer" aria-labelledby="prompt-title">
       <h3 id="prompt-title">New conversation</h3>
       <div class="model-picker">
         <label for="model">Local model</label>
-        <select id="model" aria-describedby="model-hint">
-          <option value="core-0.1">Ai'Hub Core 0.1</option>
-        </select>
-        <p id="model-hint" class="hint">Only checkpoints reported by your local server are selectable. Unsupported tasks are never sent to external APIs.</p>
+        <select id="model"><option>Loading…</option></select>
+        <p class="hint">This first build contains a tiny statistical bigram model to verify fully offline inference. It is not yet the planned reasoning Transformer.</p>
       </div>
       <label for="prompt">Message</label>
       <textarea id="prompt" rows="5" maxlength="12000" placeholder="Write a prompt…" required></textarea>
       <div class="settings">
-        <div>
-          <label for="tokens">New tokens</label>
-          <select id="tokens">
-            <option value="32">32</option>
-            <option value="64" selected>64</option>
-            <option value="128">128</option>
-            <option value="256">256</option>
-          </select>
-        </div>
-        <div>
-          <label for="temperature">Temperature</label>
-          <select id="temperature">
-            <option value="0.4">0.4</option>
-            <option value="0.7">0.7</option>
-            <option value="0.8" selected>0.8</option>
-            <option value="1">1.0</option>
-          </select>
-        </div>
-        <div>
-          <label for="topk">Top-k</label>
-          <select id="topk">
-            <option value="10">10</option>
-            <option value="20">20</option>
-            <option value="40" selected>40</option>
-            <option value="80">80</option>
-          </select>
-        </div>
+        <div><label for="tokens">New tokens</label><select id="tokens"><option value="16">16</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option></select></div>
       </div>
       <button id="send" class="primary" type="button">Generate response</button>
       <p id="error" class="error" role="alert" hidden></p>
     </section>
-
     <section class="panel response-panel" aria-labelledby="response-title">
-      <div class="section-heading">
-        <h3 id="response-title">Model response</h3>
-        <button id="copy" class="secondary small" type="button" disabled>Copy</button>
-      </div>
+      <div class="section-heading"><h3 id="response-title">Model response</h3><button id="copy" class="secondary small" type="button" disabled>Copy</button></div>
       <pre id="response" aria-live="polite">Your model output will appear here.</pre>
-      <p class="disclaimer">Core 0.1 is experimental. Generated text may be incoherent or incorrect. No cloud AI service is used by this interface.</p>
+      <p class="disclaimer">Experimental statistical baseline only. It predicts likely next words from a tiny synthetic corpus; it does not understand questions or perform general reasoning.</p>
     </section>
-
-    <footer>Ai'Hub Core · Experimental local interface</footer>
+    <footer>Ai'Hub Core · Offline prototype 0.1</footer>
   </main>
   <script src="/app.js" defer></script>
 </body>

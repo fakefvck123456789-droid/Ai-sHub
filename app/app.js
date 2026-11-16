@@ -1,59 +1,29 @@
-const endpointInput = document.querySelector("#endpoint");
 const statusNode = document.querySelector("#status");
 const promptInput = document.querySelector("#prompt");
 const responseNode = document.querySelector("#response");
 const errorNode = document.querySelector("#error");
 const sendButton = document.querySelector("#send");
 const copyButton = document.querySelector("#copy");
-const modelSelect = document.querySelector("#model");
 
-function apiBase() {
-  return endpointInput.value.trim().replace(/\/+$/, "");
-}
 function showError(message) {
   errorNode.textContent = message;
   errorNode.hidden = !message;
 }
-async function checkServer() {
-  statusNode.textContent = "Checking…";
-  statusNode.className = "status";
-  try {
-    const response = await fetch(apiBase() + "/health", { cache: "no-store" });
-    if (!response.ok) throw new Error("Server returned HTTP " + response.status);
-    const info = await response.json();
-    statusNode.textContent = "Online · " + (info.model || "Model ready");
-    statusNode.className = "status online";
-    const modelsResponse = await fetch(apiBase() + "/models", { cache: "no-store" });
-    if (!modelsResponse.ok) throw new Error("Could not load local model list.");
-    const registry = await modelsResponse.json();
-    if (registry.external_fallback !== false || !Array.isArray(registry.data)) {
-      throw new Error("Server did not confirm local-only model routing.");
-    }
-    const selected = modelSelect.value;
-    modelSelect.replaceChildren();
-    for (const model of registry.data) {
-      if (!model.capabilities?.includes("text_generation")) continue;
-      const option = document.createElement("option");
-      option.value = model.id;
-      option.textContent = model.id + " · " + model.status;
-      modelSelect.append(option);
-    }
-    if (![...modelSelect.options].some(option => option.value === selected)) {
-      modelSelect.selectedIndex = 0;
-    } else {
-      modelSelect.value = selected;
-    }
-    if (!modelSelect.options.length) throw new Error("No local text-generation model is loaded.");
-    return true;
-  } catch (error) {
-    statusNode.textContent = "Offline";
+
+function initialize() {
+  if (!window.AiHub || typeof AiHub.generate !== "function") {
+    statusNode.textContent = "Unavailable";
     statusNode.className = "status offline";
-    showError("Cannot reach the local model server. Check the address and make sure the server is running. " + error.message);
-    return false;
+    showError("The on-device model runtime is unavailable. Reinstall the official Ai'Hub Android build.");
+    sendButton.disabled = true;
+    return;
   }
+  statusNode.textContent = "Ready · " + AiHub.modelName();
+  statusNode.className = "status online";
+  document.querySelector("#model").replaceChildren(new Option(AiHub.modelName(), "core-prototype"));
 }
-document.querySelector("#check").addEventListener("click", checkServer);
-sendButton.addEventListener("click", async () => {
+
+sendButton.addEventListener("click", () => {
   const prompt = promptInput.value.trim();
   if (!prompt) {
     showError("Write a message first.");
@@ -63,25 +33,13 @@ sendButton.addEventListener("click", async () => {
   showError("");
   sendButton.disabled = true;
   sendButton.textContent = "Generating…";
-  responseNode.textContent = "The local model is generating…";
+  responseNode.textContent = "Generating on this device…";
   copyButton.disabled = true;
   try {
-    const response = await fetch(apiBase() + "/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt,
-        model: modelSelect.value,
-        task: "text_generation",
-        max_new_tokens: Number(document.querySelector("#tokens").value),
-        temperature: Number(document.querySelector("#temperature").value),
-        top_k: Number(document.querySelector("#topk").value)
-      })
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || payload.error || "HTTP " + response.status);
-    responseNode.textContent = payload.text || "(The model returned an empty response.)";
-    copyButton.disabled = !payload.text;
+    const result = JSON.parse(AiHub.generate(prompt, Number(document.querySelector("#tokens").value)));
+    if (result.error) throw new Error(result.error);
+    responseNode.textContent = result.text || "(The model returned an empty response.)";
+    copyButton.disabled = !result.text;
   } catch (error) {
     responseNode.textContent = "No response.";
     showError("Generation failed: " + error.message);
@@ -90,16 +48,15 @@ sendButton.addEventListener("click", async () => {
     sendButton.textContent = "Generate response";
   }
 });
+
 copyButton.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(responseNode.textContent);
     copyButton.textContent = "Copied";
     setTimeout(() => { copyButton.textContent = "Copy"; }, 1200);
   } catch {
-    showError("Clipboard access is unavailable in this browser context.");
+    showError("Clipboard access is unavailable in this app context.");
   }
 });
-if ("serviceWorker" in navigator && (location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
-}
-checkServer();
+
+initialize();
