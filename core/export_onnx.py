@@ -62,6 +62,8 @@ def export_checkpoint(checkpoint_path: Path, output_path: Path,
     tokenizer_path.write_text(json.dumps(tokenizer.to_dict(), ensure_ascii=False), encoding="utf-8")
     metadata_path.write_text(json.dumps({
         "project": "Ai'Hub Core 0.1",
+        "languages": payload.get("languages", ["en"]),
+        "language_policy": payload.get("language_policy", "unspecified"),
         "config": config.__dict__,
         "tokenizer_file": tokenizer_path.name,
         "model_file": output_path.name,

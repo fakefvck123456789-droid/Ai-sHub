@@ -163,6 +163,8 @@ def train(corpus_path: Path, output_path: Path, steps: int = 1000,
     torch.save({
         "format_version": 1,
         "project": "Ai'Hub Core 0.1",
+        "languages": list(base_config.get("languages", ["en"])),
+        "language_policy": base_config.get("language_policy", "unspecified"),
         "status": "experimental_unvalidated_training_run",
         "corpus_sha256": corpus_sha256,
         "config": model.config_dict(),

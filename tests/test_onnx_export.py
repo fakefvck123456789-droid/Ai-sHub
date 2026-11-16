@@ -65,6 +65,7 @@ class OnnxExportTests(unittest.TestCase):
             self.assertTrue(onnx_path.exists())
             metadata = __import__("json").loads(Path(result["metadata"]).read_text())
             self.assertEqual(metadata["config"]["vocab_size"], result["vocabulary"])
+            self.assertEqual(metadata["languages"], ["bn", "en"])
             self.assertTrue(Path(result["tokenizer"]).exists())
 
 
