@@ -41,10 +41,16 @@ final class CoreOnnxRuntime implements AutoCloseable {
 
     private CoreOnnxRuntime(AssetManager assets) throws Exception {
         JSONObject metadata = new JSONObject(readAsset(assets, "core-0.1-model.json"));
+        if (!"Ai'Hub Core 0.1".equals(metadata.getString("project")))
+            throw new IllegalArgumentException("Unexpected Core model project");
         JSONObject config = metadata.getJSONObject("config");
         contextLength = config.getInt("context_length");
         vocabSize = config.getInt("vocab_size");
+        if (contextLength < 1 || vocabSize < 256)
+            throw new IllegalArgumentException("Invalid Core model dimensions");
         tokenizer = new ByteBpe(readAsset(assets, "core-0.1-tokenizer.json"));
+        if (tokenizer.vocabSize() != vocabSize)
+            throw new IllegalArgumentException("Tokenizer and model vocabulary sizes differ");
         environment = OrtEnvironment.getEnvironment();
         OrtSession.SessionOptions options = new OrtSession.SessionOptions();
         options.setIntraOpNumThreads(Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
@@ -63,17 +69,17 @@ final class CoreOnnxRuntime implements AutoCloseable {
             long[] ids = new long[tokens.size() - start];
             for (int i = start; i < tokens.size(); i++) ids[i - start] = tokens.get(i);
             long[] shape = new long[]{1, ids.length};
-            try (OnnxTensor input = OnnxTensor.createTensor(environment,
-                    LongBuffer.wrap(ids), shape);
+            try (OnnxTensor input = OnnxTensor.createTensor(environment, LongBuffer.wrap(ids), shape);
                  OrtSession.Result result = session.run(Collections.singletonMap(inputName, input))) {
                 float[][][] logits = (float[][][]) result.get(0).getValue();
                 float[] last = logits[0][logits[0].length - 1];
                 int next = sampleTopK(last, 40);
-                if (next < 0 || next >= vocabSize) throw new IllegalStateException("Model emitted an invalid token ID.");
+                if (next < 0 || next >= vocabSize)
+                    throw new IllegalStateException("Model emitted an invalid token ID.");
                 tokens.add(next);
             }
         }
-        return tokenizer.decode(tokens);
+        return tokenizer.decode(tokens.subList(tokens.size() - maxTokens, tokens.size()));
     }
 
     private int sampleTopK(float[] logits, int topK) {
@@ -148,6 +154,8 @@ final class CoreOnnxRuntime implements AutoCloseable {
                 expansions.add(combined);
             }
         }
+
+        int vocabSize() { return expansions.size(); }
 
         List<Integer> encode(String text) {
             byte[] raw = text.getBytes(StandardCharsets.UTF_8);
