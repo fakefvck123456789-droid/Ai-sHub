@@ -39,8 +39,8 @@ class BytePairTokenizer:
             raise ValueError("vocab_size must be at least 256 for byte-level BPE")
         raw = text.encode("utf-8")
         if len(raw) > self.max_training_bytes:
-            chunks = min(8, self.max_training_bytes)
-            chunk_size = max(1, self.max_training_bytes // chunks)
+            chunks = min(8, max(1, self.max_training_bytes // 2))
+            chunk_size = max(1, (self.max_training_bytes - (chunks - 1)) // chunks)
             last_start = len(raw) - chunk_size
             starts = ([i * last_start // (chunks - 1) for i in range(chunks)]
                       if chunks > 1 else [0])
